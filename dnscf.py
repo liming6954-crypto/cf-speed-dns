@@ -166,17 +166,20 @@ def telegram_push(content):
         return
     url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
     data = {
-        "token": TG_BOT_TOKEN,
+        #"token": TG_BOT_TOKEN,
         "chat_id": TG_USER_ID,
-        "content": content,
-        "template": "markdown",
-        "channel": "TG",
+        #"content": content,
+        #"template": "markdown",
+        #"channel": "TG",
         "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
         "parse_mode": "HTML"
     }
     try:
-        r = requests.post(url, json=data, timeout=DEFAULT_TIMEOUT)
-        print(f"TG 推送状态: {r.status_code}")
+         r = requests.post(url, json=data, timeout=DEFAULT_TIMEOUT)
+       if r.status_code == 200:
+            print(f"TG 推送状态: {r.status_code}")
+        else:
+            print(f"TG 推送失败，状态码: {r.status_code}, 响应: {r.text}")
     except Exception as e:
         print(f"TG 推送异常: {e}")
 
