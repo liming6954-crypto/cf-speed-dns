@@ -223,7 +223,7 @@ def main():
             telegram_push_content.append(dns)
     # 发送推送
     if telegram_push_content:
-        push_plus('\n'.join(telegram_push_content))
+        telegram_push_content.append('\n'.join(telegram_push_content))
 
 
 if __name__ == '__main__':
