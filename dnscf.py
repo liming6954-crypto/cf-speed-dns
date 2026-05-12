@@ -133,26 +133,26 @@ def update_dns_record(record_info, name, cf_ip):
         print(f"cf_dns_change ERROR: ---- Time: {current_time} ---- MESSAGE: {e}")
         return f"ip:{cf_ip} 解析 {name} 失败"
 
+#微信推送
+#   def push_plus(content):
+#   """
+#   发送 PushPlus 消息推送
 
-#def push_plus(content):
- #   """
- #   发送 PushPlus 消息推送
+#   Args:
+#     content: 消息内容
+#  """
+#  if not PUSHPLUS_TOKEN:
+#       print("PUSHPLUS_TOKEN 未设置，跳过消息推送")
+#      return
 
- #   Args:
-   #     content: 消息内容
-   #  """
-   #  if not PUSHPLUS_TOKEN:
-  #       print("PUSHPLUS_TOKEN 未设置，跳过消息推送")
-   #      return
-
-  #   url = 'http://www.pushplus.plus/send'
-  #   data = {
-  #      "token": PUSHPLUS_TOKEN,
-  #     "title": "IP优选DNSCF推送",
-  #      "content": content,
-  #     "template": "markdown",
-  #     "channel": "wechat"
-  #     }
+ #   url = 'http://www.pushplus.plus/send'
+ #   data = {
+ #      "token": PUSHPLUS_TOKEN,
+ #     "title": "IP优选DNSCF推送",
+ #      "content": content,
+ #     "template": "markdown",
+ #     "channel": "wechat"
+ #     }
 
   # try:
   #    body = json.dumps(data).encode(encoding='utf-8')
@@ -160,45 +160,25 @@ def update_dns_record(record_info, name, cf_ip):
   #    requests.post(url, data=body, headers=headers, timeout=DEFAULT_TIMEOUT)
  #  except Exception as e:
    #     print(f"消息推送失败: {e}")
+
 def telegram_push(content):
-    token = os.environ.get("TG_BOT_TOKEN")
-    chat_id = os.environ.get("TG_USER_ID")
-    
     # 如果没有环境变量，直接退出
-    if not token or not chat_id:
+    if not TG_BOT_TOKEN or not TG_USER_ID:
         print("TG 配置缺失")
         return
 
-    # 第二步：确保变量名就叫 url
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    
+    # msg url
+    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
     data = {
         "chat_id": chat_id,
         "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
         "parse_mode": "HTML"
     }
-    #if not TG_BOT_TOKEN or not TG_USER_ID:
-    #   print("未配置 TG 推送")
-    #    return
-     #   token = "8742940363:AAErQuQLxavQeTmyquJ6kMDJG3w_-cMv14k"
-      #  chat_id = "8667075997"
-      #  url = f"https://api.telegram.org/bot{token}/sendMessage"
-      #  #url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getMe"
-        #url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
 
-       # data = {
-        #"token": TG_BOT_TOKEN,
-       # "chat_id": chat_id,
-        #"content": content,
-        #"template": "markdown",
-        #"channel": "TG",
-       # "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
-       # "parse_mode": "HTML"
-      #  }
     try:
         r = requests.post(url, json=data, timeout=DEFAULT_TIMEOUT)
         if r.status_code == 200:
-            print(f"TG 推送失败，状态码: {r.status_code}, 响应: {r.text}")
+            print(f"TG 推送成功，状态码: {r.status_code}, 响应: {r.text}")
         else:
             print(f"TG 推送失败: {r.status_code}")
     except Exception as e:
@@ -234,27 +214,18 @@ def main():
         ip_addresses = ip_addresses[:len(dns_records)]
 
     # 更新 DNS 记录
-   # push_plus_content = []
-
- #   for index, ip_address in enumerate(ip_addresses):
- #       dns = update_dns_record(dns_records[index], CF_DNS_NAME, ip_address)
- #      push_plus_content.append(dns)
-
-
     telegram_push_content=[]
     for index, ip_address in enumerate(ip_addresses):
             dns = update_dns_record(dns_records[index], CF_DNS_NAME, ip_address)
             telegram_push_content.append(dns)
+
     # 发送推送
-    #if telegram_push_content:
-        #telegram_push_content.append('\n'.join(telegram_push_content))
-        
     if telegram_push_content:
         # 将列表转为字符串
-        full_content = '\n'.join(telegram_push_content)
+        #full_content = '\n'.join(telegram_push_content)
+        full_content = telegram_push_content.append('\n'.join(telegram_push_content))
         # 真正调用发送函数！！
         telegram_push(full_content)
-
 
 if __name__ == '__main__':
     main()
