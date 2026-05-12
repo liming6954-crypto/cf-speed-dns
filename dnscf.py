@@ -43,7 +43,6 @@ def is_valid_ipv4(ip: str) -> bool:
 def get_cf_speed_test_ip():
     """获取优选 IP"""
     sources = [
-        'https://ip.164746.xyz',
         'https://ip.164746.xyz/ipTop.html',
     ]
 
@@ -65,7 +64,7 @@ def get_dns_record_by_name(name):
     try:
         url = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/dns_records"
         resp = requests.get(url, headers=HEADERS, timeout=DEFAULT_TIMEOUT)
-        
+
         if resp.status_code != 200:
             return None
 
