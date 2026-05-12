@@ -16,17 +16,25 @@ TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
 
 DOMAIN_ROOT = "072503.xyz"
 
-# 最大更新数量（A + CNAME）
-MAX_TOTAL_UPDATES = 10
+# 最大DNS记录数量
+MAX_TOTAL_RECORDS = 10
+
+# 最大A记录数量
+MAX_A_RECORDS = 4
 
 # =========================================================
 # A记录
 # =========================================================
+# (域名, 使用第几个优选IP)
 
 A_RECORDS = [
-    "dns.072503.xyz",
-    "dns1.072503.xyz",
-    "dns2.072503.xyz"
+
+    ("dns.072503.xyz", 0),
+    ("dns.072503.xyz", 1),
+
+    ("dns1.072503.xyz", 0),
+
+    ("dns2.072503.xyz", 1),
 ]
 
 # =========================================================
@@ -85,7 +93,6 @@ def send_telegram(message):
 
     except Exception:
         traceback.print_exc()
-
 
 # =========================================================
 # IP检测
@@ -147,7 +154,6 @@ def get_cf_speed_test_ip():
 
     return all_ips
 
-
 # =========================================================
 # Cloudflare DNS
 # =========================================================
@@ -174,28 +180,16 @@ def get_existing_records():
             print("Cloudflare API失败")
             print(data)
 
-            return {}
+            return []
 
-        records = {}
-
-        for r in data.get("result", []):
-
-            key = f"{r['type']}:{r['name'].lower()}"
-
-            records[key] = {
-                "id": r["id"],
-                "content": r["content"],
-                "type": r["type"]
-            }
-
-        return records
+        return data.get("result", [])
 
     except Exception:
 
         print("获取DNS记录失败")
         traceback.print_exc()
 
-        return {}
+        return []
 
 
 def create_record(record_type, name, content):
@@ -275,7 +269,6 @@ def update_record(record_id, record_type, name, content):
 
         return False
 
-
 # =========================================================
 # 主程序
 # =========================================================
@@ -283,10 +276,6 @@ def update_record(record_id, record_type, name, content):
 def main():
 
     tg_results = []
-
-    # =====================================================
-    # 检查环境变量
-    # =====================================================
 
     if not CF_API_TOKEN:
         print("缺少 CF_API_TOKEN")
@@ -313,12 +302,21 @@ def main():
         return
 
     # =====================================================
-    # 获取DNS记录
+    # 获取现有DNS
     # =====================================================
 
     existing = get_existing_records()
 
     updated_count = 0
+
+    # 当前DNS总数
+    current_total_records = len(existing)
+
+    # 当前A记录数量
+    current_a_records = len([
+        r for r in existing
+        if r["type"] == "A"
+    ])
 
     # =====================================================
     # A记录
@@ -326,22 +324,23 @@ def main():
 
     print("\n========== A记录 ==========\n")
 
-    for index, domain in enumerate(A_RECORDS):
+    for domain, ip_index in A_RECORDS:
 
-        if updated_count >= MAX_TOTAL_UPDATES:
-            break
+        ip = ips[ip_index % len(ips)]
 
-        ip = ips[index % len(ips)]
+        found = False
 
-        key = f"A:{domain.lower()}"
+        for record in existing:
 
-        # 已存在
-        if key in existing:
+            if record["type"] != "A":
+                continue
 
-            record = existing[key]
+            if (
+                record["name"].lower() == domain.lower()
+                and record["content"] == ip
+            ):
 
-            # IP相同 跳过
-            if record["content"] == ip:
+                found = True
 
                 print(f"跳过 A {domain} -> {ip}")
 
@@ -349,26 +348,32 @@ def main():
                     f"⏭ 跳过A\n{domain}\n{ip}"
                 )
 
-                continue
+                break
 
-            # 更新
-            success = update_record(
-                record["id"],
-                "A",
-                domain,
-                ip
-            )
+        # 不存在则创建
+        if not found:
 
-            if success:
+            # 超过A记录限制
+            if current_a_records >= MAX_A_RECORDS:
 
-                updated_count += 1
+                print(f"A记录达到上限 跳过 {domain}")
 
                 tg_results.append(
-                    f"✅ 更新A\n{domain}\n→ {ip}"
+                    f"⚠️ A记录达到上限\n{domain}"
                 )
 
-        # 不存在 创建
-        else:
+                continue
+
+            # 超过总记录限制
+            if current_total_records >= MAX_TOTAL_RECORDS:
+
+                print(f"DNS总记录达到上限 跳过 {domain}")
+
+                tg_results.append(
+                    f"⚠️ DNS记录达到上限\n{domain}"
+                )
+
+                continue
 
             success = create_record(
                 "A",
@@ -378,6 +383,8 @@ def main():
 
             if success:
 
+                current_a_records += 1
+                current_total_records += 1
                 updated_count += 1
 
                 tg_results.append(
@@ -390,53 +397,61 @@ def main():
 
     print("\n========== CNAME ==========\n")
 
-    cname_ips = ips[:4]
+    for cname_name, target in CNAME_TARGETS.items():
 
-    for index, (subdomain, target) in enumerate(CNAME_TARGETS.items()):
+        found = False
 
-        if updated_count >= MAX_TOTAL_UPDATES:
-            break
+        for record in existing:
 
-        ip_tag = cname_ips[index % len(cname_ips)].replace(".", "-")
+            if record["type"] != "CNAME":
+                continue
 
-        cname_name = f"{ip_tag}.{subdomain}"
+            if (
+                record["name"].lower() == cname_name.lower()
+            ):
 
-        key = f"CNAME:{cname_name.lower()}"
+                found = True
 
-        # 已存在
-        if key in existing:
+                # 相同则跳过
+                if record["content"].lower() == target.lower():
 
-            record = existing[key]
+                    print(f"跳过 CNAME {cname_name}")
 
-            # 相同则跳过
-            if record["content"].lower() == target.lower():
+                    tg_results.append(
+                        f"⏭ 跳过CNAME\n{cname_name}"
+                    )
 
-                print(f"跳过 CNAME {cname_name}")
+                else:
+
+                    success = update_record(
+                        record["id"],
+                        "CNAME",
+                        cname_name,
+                        target
+                    )
+
+                    if success:
+
+                        updated_count += 1
+
+                        tg_results.append(
+                            f"✅ 更新CNAME\n{cname_name}\n→ {target}"
+                        )
+
+                break
+
+        # 不存在则创建
+        if not found:
+
+            if current_total_records >= MAX_TOTAL_RECORDS:
+
+                print(f"DNS总记录达到上限 跳过 {cname_name}")
 
                 tg_results.append(
-                    f"⏭ 跳过CNAME\n{cname_name}"
+                    f"⚠️ DNS记录达到上限\n{cname_name}"
                 )
 
                 continue
-
-            # 更新
-            success = update_record(
-                record["id"],
-                "CNAME",
-                cname_name,
-                target
-            )
-
-            if success:
-
-                updated_count += 1
-
-                tg_results.append(
-                    f"✅ 更新CNAME\n{cname_name}\n→ {target}"
-                )
-
-        # 不存在 创建
-        else:
 
             success = create_record(
                 "CNAME",
@@ -446,6 +461,7 @@ def main():
 
             if success:
 
+                current_total_records += 1
                 updated_count += 1
 
                 tg_results.append(
@@ -458,6 +474,7 @@ def main():
 
     print("\n==============================")
     print(f"更新数量: {updated_count}")
+    print(f"当前DNS记录数: {current_total_records}")
     print("==============================")
 
     # =====================================================
@@ -471,7 +488,8 @@ def main():
             message = (
                 f"🌐 DNS自动更新完成\n\n"
                 f"域名: {DOMAIN_ROOT}\n"
-                f"更新数量: {updated_count}\n\n"
+                f"更新数量: {updated_count}\n"
+                f"当前DNS记录数: {current_total_records}\n\n"
                 + "\n\n".join(tg_results[:20])
             )
 
@@ -488,7 +506,6 @@ def main():
     except Exception:
 
         traceback.print_exc()
-
 
 # =========================================================
 # 入口
