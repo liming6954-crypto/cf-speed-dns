@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Cloudflare DNS 优选IP自动更新工具
+Cloudflare DNS 优选IP自动更新工具 - 多子域名支持版
 """
 
 import os
@@ -13,7 +13,14 @@ import re
 # ==================== 配置 ====================
 CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
 CF_ZONE_ID = os.environ.get("CF_ZONE_ID")
-CF_DNS_NAME = os.environ.get("CF_DNS_NAME")   # 如: cf.example.com
+
+# 主域名配置
+CF_DNS_NAME = os.environ.get("CF_DNS_NAME")          # 如: dns.072503.xyz
+
+# 多子域名模式配置（推荐使用）
+ENABLE_MULTI_SUBDOMAIN = True                        # 开启多子域名模式
+SUBDOMAIN_PREFIX = "dns"                             # 子域名前缀 → dns1, dns2, dns3...
+DOMAIN_ROOT = "072503.xyz"                           # 根域名
 
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
 TG_USER_ID = os.environ.get("TG_USER_ID")
@@ -27,7 +34,6 @@ DEFAULT_TIMEOUT = 30
 
 
 def is_valid_ipv4(ip: str) -> bool:
-    """简单验证 IPv4 地址"""
     pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
     if not re.match(pattern, ip):
         return False
@@ -35,8 +41,9 @@ def is_valid_ipv4(ip: str) -> bool:
 
 
 def get_cf_speed_test_ip():
-    """获取优选 IP，支持多个备用源"""
+    """获取优选 IP"""
     sources = [
+        'https://ip.164746.xyz',
         'https://ip.164746.xyz/ipTop.html',
     ]
 
@@ -46,48 +53,47 @@ def get_cf_speed_test_ip():
             if resp.status_code == 200:
                 text = resp.text.strip()
                 if text:
-                    print(f"成功从 {url} 获取 IP")
+                    print(f"成功获取 IP: {text[:100]}...")
                     return text
         except Exception as e:
             print(f"从 {url} 获取失败: {e}")
-
-    print("所有 IP 来源均获取失败")
     return None
 
 
-def get_dns_records(name):
-    """获取 Cloudflare A 记录"""
+def get_dns_record_by_name(name):
+    """获取单个域名对应的 DNS 记录"""
     try:
         url = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/dns_records"
         resp = requests.get(url, headers=HEADERS, timeout=DEFAULT_TIMEOUT)
         
         if resp.status_code != 200:
-            print(f"获取记录失败: {resp.status_code} {resp.text}")
-            return []
+            return None
 
-        records = []
         for r in resp.json().get('result', []):
             if r.get('type') == 'A' and r.get('name') == name:
-                records.append({
-                    'id': r['id'],
-                    'content': r.get('content')
-                })
-        return records
-    except Exception as e:
+                return {'id': r['id'], 'content': r.get('content')}
+        return None
+    except Exception:
         traceback.print_exc()
-        return []
+        return None
 
 
-def update_dns_record(record_info, name, new_ip):
-    """更新 DNS 记录"""
+def update_dns_record(name, new_ip):
+    """更新 DNS 并返回指定格式"""
     if not is_valid_ipv4(new_ip):
-        return f"❌ {name} → {new_ip} (非法IP，跳过)"
+        return f"ip:{new_ip} 解析 {name} 失败 (非法IP)"
 
-    if record_info['content'] == new_ip:
-        return f"✅ {name} → {new_ip} (已是最新，跳过)"
+    record = get_dns_record_by_name(name)
+    if not record:
+        return f"ip:{new_ip} 解析 {name} 失败 (记录不存在，请先创建)"
+
+    old_ip = record.get('content', '')
+
+    if old_ip == new_ip:
+        return f"ip:{new_ip} 解析 {name} 跳过 (已是最新)"
 
     try:
-        url = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/dns_records/{record_info['id']}"
+        url = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/dns_records/{record['id']}"
         data = {
             "type": "A",
             "name": name,
@@ -95,15 +101,16 @@ def update_dns_record(record_info, name, new_ip):
             "ttl": 60,
             "proxied": False
         }
+
         resp = requests.put(url, headers=HEADERS, json=data, timeout=DEFAULT_TIMEOUT)
 
         if resp.status_code == 200:
-            return f"✅ {name} → {new_ip} (更新成功)"
+            return f"ip:{new_ip} 解析 {name} 成功"
         else:
-            return f"❌ {name} → 更新失败 ({resp.status_code})"
-    except Exception as e:
+            return f"ip:{new_ip} 解析 {name} 失败"
+    except Exception:
         traceback.print_exc()
-        return f"❌ {name} → 更新异常"
+        return f"ip:{new_ip} 解析 {name} 失败"
 
 
 def telegram_push(content: str):
@@ -114,7 +121,7 @@ def telegram_push(content: str):
         url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
         data = {
             "chat_id": TG_USER_ID,
-            "text": f"🚀 <b>Cloudflare IP 自动更新</b>\n\n{content}",
+            "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
             "parse_mode": "HTML"
         }
         requests.post(url, json=data, timeout=10)
@@ -123,8 +130,8 @@ def telegram_push(content: str):
 
 
 def main():
-    if not all([CF_API_TOKEN, CF_ZONE_ID, CF_DNS_NAME]):
-        print("❌ 错误：缺少必要的环境变量")
+    if not all([CF_API_TOKEN, CF_ZONE_ID]):
+        print("❌ 缺少必要的环境变量")
         return
 
     ip_str = get_cf_speed_test_ip()
@@ -133,19 +140,31 @@ def main():
         return
 
     ip_list = [ip.strip() for ip in ip_str.split(',') if ip.strip()]
-
-    records = get_dns_records(CF_DNS_NAME)
-    if not records:
-        print(f"❌ 未找到域名 {CF_DNS_NAME} 的 A 记录")
-        telegram_push(f"❌ 未找到域名 {CF_DNS_NAME} 的 A 记录")
+    if not ip_list:
+        telegram_push("❌ 未获取到有效IP")
         return
 
     results = []
-    for i in range(min(len(ip_list), len(records))):
-        res = update_dns_record(records[i], CF_DNS_NAME, ip_list[i])
-        results.append(res)
-        print(res)
 
+    if ENABLE_MULTI_SUBDOMAIN and SUBDOMAIN_PREFIX and DOMAIN_ROOT:
+        # ==================== 多子域名模式 ====================
+        print(f"启用多子域名模式 → {SUBDOMAIN_PREFIX}1.{DOMAIN_ROOT}, {SUBDOMAIN_PREFIX}2.{DOMAIN_ROOT} ...")
+        for i, ip in enumerate(ip_list):
+            subdomain_name = f"{SUBDOMAIN_PREFIX}{i+1}.{DOMAIN_ROOT}"
+            result = update_dns_record(subdomain_name, ip)
+            results.append(result)
+            print(result)
+    else:
+        # ==================== 单域名模式 ====================
+        if not CF_DNS_NAME:
+            print("❌ 单域名模式下必须设置 CF_DNS_NAME")
+            return
+        for ip in ip_list[:5]:   # 限制最多更新5条相同记录
+            result = update_dns_record(CF_DNS_NAME, ip)
+            results.append(result)
+            print(result)
+
+    # 发送 Telegram 推送
     if results:
         telegram_push("\n".join(results))
 
