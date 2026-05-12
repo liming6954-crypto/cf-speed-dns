@@ -157,32 +157,32 @@ def telegram_push(content):
 
 
 
-def push_plus(content):
-    """
-    发送 PushPlus 消息推送
+#def push_plus(content):
+#   """
+#    发送 PushPlus 消息推送
 
-    Args:
+#   Args:
         content: 消息内容
-    """
-    if not PUSHPLUS_TOKEN:
-        print("PUSHPLUS_TOKEN 未设置，跳过消息推送")
-        return
+#   """
+#   if not PUSHPLUS_TOKEN:
+#      print("PUSHPLUS_TOKEN 未设置，跳过消息推送")
+#      return
 
-    url = 'http://www.pushplus.plus/send'
-    data = {
-        "token": PUSHPLUS_TOKEN,
-        "title": "IP优选DNSCF推送",
-        "content": content,
-        "template": "markdown",
-        "channel": "wechat"
-    }
+#  url = 'http://www.pushplus.plus/send'
+# data = {
+#     "token": PUSHPLUS_TOKEN,
+#     "title": "IP优选DNSCF推送",
+#        "content": content,
+#       "template": "markdown",
+#        "channel": "wechat"
+#    }
 
-    try:
-        body = json.dumps(data).encode(encoding='utf-8')
-        headers = {'Content-Type': 'application/json'}
-        requests.post(url, data=body, headers=headers, timeout=DEFAULT_TIMEOUT)
-    except Exception as e:
-        print(f"消息推送失败: {e}")
+ #   try:
+ #       body = json.dumps(data).encode(encoding='utf-8')
+ #       headers = {'Content-Type': 'application/json'}
+ #       requests.post(url, data=body, headers=headers, timeout=DEFAULT_TIMEOUT)
+     #  except Exception as e:
+    #     print(f"消息推送失败: {e}")
 
 
 def main():
