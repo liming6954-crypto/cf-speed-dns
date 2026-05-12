@@ -208,13 +208,13 @@ def main():
         return
 
     # 获取最新优选 IP
-    ip_addresses_str = get_cf_speed_test_ip()
+        ip_addresses_str = get_cf_speed_test_ip()
     if not ip_addresses_str:
         print("错误: 无法获取优选 IP")
         return
-    ip_addresses = [ip.strip() for ip in ip_addresses_str.split(',') if ip.strip()]
+        ip_addresses = [ip.strip() for ip in ip_addresses_str.split(',') if ip.strip()]
     # 从 dns.0725.xyz 拆分出前缀和后缀
-        prefix = parts[0]  # 'dns'
+        prefix = parts[0]  
         domain_root = '.'.join(parts[1:]) # '0725.xyz'
 for index, ip_address in enumerate(ip_addresses):
         # 动态生成 dns1.0725.xyz, dns2.0725.xyz...
@@ -222,8 +222,6 @@ for index, ip_address in enumerate(ip_addresses):
         # 去 CF 查找这个带编号的域名
         records = get_dns_records(current_name)
 
-
-     #
 if records:
             # 找到记录（取第一个 ID），进行更新
             res = update_dns_record(records[0], current_name, ip_address)
