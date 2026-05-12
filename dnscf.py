@@ -170,7 +170,7 @@ def telegram_push(content):
     # msg url
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
     data = {
-        "chat_id": chat_id,
+        "chat_id": TG_USER_ID,
         "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
         "parse_mode": "HTML"
     }
