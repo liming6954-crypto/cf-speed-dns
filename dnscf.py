@@ -221,9 +221,12 @@ def main():
         push_plus_content.append(dns)
 
     # 发送推送
-    if push_plus_content:
-        push_plus('\n'.join(push_plus_content))
+    #if push_plus_content:
+    #  push_plus('\n'.join(push_plus_content))
 
+if results:
+        msg = '\n'.join(results)
+        telegram_push(msg)
 
 if __name__ == '__main__':
     main()
