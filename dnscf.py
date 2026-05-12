@@ -177,9 +177,9 @@ def telegram_push(content):
     try:
          r = requests.post(url, json=data, timeout=DEFAULT_TIMEOUT)
         if r.status_code == 200:
-            print(f"TG 推送状态: {r.status_code}")
-        else:
             print(f"TG 推送失败，状态码: {r.status_code}, 响应: {r.text}")
+        else:
+            print(f"TG 推送失败: {r.status_code}")
     except Exception as e:
         print(f"TG 推送异常: {e}")
 
