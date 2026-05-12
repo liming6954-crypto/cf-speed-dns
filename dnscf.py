@@ -196,9 +196,26 @@ def main():
     if not ip_addresses_str:
         print("错误: 无法获取优选 IP")
         return
-
     ip_addresses = [ip.strip() for ip in ip_addresses_str.split(',') if ip.strip()]
-    if not ip_addresses:
+
+    # 从 dns.0725.xyz 拆分出前缀和后缀
+        parts = CF_DNS_NAME.split('.')
+        prefix = parts[0]  # 'dns'
+        domain_root = '.'.join(parts[1:]) # '0725.xyz'
+for index, ip_address in enumerate(ip_addresses):
+        # 动态生成 dns1.0725.xyz, dns2.0725.xyz...
+        current_name = f"{prefix}{index + 1}.{domain_root}"
+
+        # 去 CF 查找这个带编号的域名
+        records = get_dns_records(current_name)
+if records:
+            # 找到记录（取第一个 ID），进行更新
+            res = update_dns_record(records[0], current_name, ip_address)
+            telegram_push_content.append(res)
+        else:
+            print(f"跳过: Cloudflare 中不存在 {current_name}，请先手动创建 A 记录")
+   
+if not ip_addresses:
         print("错误: 未解析到有效 IP 地址")
         return
 
