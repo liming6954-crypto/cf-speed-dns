@@ -208,29 +208,23 @@ def main():
         return
 
     # 获取最新优选 IP
-    ip_addresses_str = get_cf_speed_test_ip()
+        ip_addresses_str = get_cf_speed_test_ip()
     if not ip_addresses_str:
         print("错误: 无法获取优选 IP")
         return
-    ip_addresses = [ip.strip() for ip in ip_addresses_str.split(',') if ip.strip()]
-
-
-
-
-########################################################
+       ip_addresses = [ip.strip() for ip in ip_addresses_str.split(',') if ip.strip()]
+    #
     # 从 dns.0725.xyz 拆分出前缀和后缀
-        parts = CF_DNS_NAME.split('.')
         prefix = parts[0]  # 'dns'
         domain_root = '.'.join(parts[1:]) # '0725.xyz'
 for index, ip_address in enumerate(ip_addresses):
         # 动态生成 dns1.0725.xyz, dns2.0725.xyz...
         current_name = f"{prefix}{index + 1}.{domain_root}"
-
         # 去 CF 查找这个带编号的域名
         records = get_dns_records(current_name)
 
 
-#############################################################################
+     #
 if records:
             # 找到记录（取第一个 ID），进行更新
             res = update_dns_record(records[0], current_name, ip_address)
@@ -243,11 +237,11 @@ if not ip_addresses:
         return
 
     # 获取 DNS 记录
-    dns_records = get_dns_records(CF_DNS_NAME)
+        dns_records = get_dns_records(CF_DNS_NAME)
     if not dns_records:
         print(f"错误: 未找到 {CF_DNS_NAME} 的 DNS 记录")
         return
-
+        
     # 检查记录数量是否足够
     if len(ip_addresses) > len(dns_records):
         print(f"警告: IP 数量({len(ip_addresses)})超过 DNS 记录数量({len(dns_records)})，只更新前 {len(dns_records)} 个")
