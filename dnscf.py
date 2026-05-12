@@ -172,7 +172,7 @@ def telegram_push(content):
     # 第二步：确保变量名就叫 url
     url = f"https://telegram.org{token}/sendMessage"
     
-    payload = {
+    data = {
         "chat_id": chat_id,
         "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
         "parse_mode": "HTML"
