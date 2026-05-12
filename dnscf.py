@@ -10,22 +10,29 @@ import traceback
 CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
 CF_ZONE_ID = os.environ.get("CF_ZONE_ID")
 
+# 兼容 TG_CHAT_ID / TG_USER_ID
+TG_CHAT_ID = os.environ.get("TG_CHAT_ID") or os.environ.get("TG_USER_ID")
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
-TG_CHAT_ID = os.environ.get("TG_CHAT_ID")
 
 DOMAIN_ROOT = "072503.xyz"
 
 # 最大更新数量（A + CNAME）
 MAX_TOTAL_UPDATES = 10
 
+# =========================================================
 # A记录
+# =========================================================
+
 A_RECORDS = [
     "dns.072503.xyz",
     "dns1.072503.xyz",
     "dns2.072503.xyz"
 ]
 
+# =========================================================
 # CNAME记录
+# =========================================================
+
 CNAME_TARGETS = {
     "cf1.072503.xyz": "www.visa.cn",
     "cf2.072503.xyz": "store.ubi.com",
@@ -33,7 +40,10 @@ CNAME_TARGETS = {
     "cf4.072503.xyz": "mfa.gov.ua"
 }
 
+# =========================================================
 # Cloudflare API
+# =========================================================
+
 BASE_URL = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/dns_records"
 
 HEADERS = {
@@ -61,11 +71,17 @@ def send_telegram(message):
             "parse_mode": "HTML"
         }
 
-        requests.post(
+        resp = requests.post(
             url,
             data=data,
             timeout=15
         )
+
+        if resp.status_code == 200:
+            print("Telegram通知发送成功")
+        else:
+            print("Telegram通知失败")
+            print(resp.text)
 
     except Exception:
         traceback.print_exc()
@@ -268,7 +284,10 @@ def main():
 
     tg_results = []
 
-    # 环境变量检查
+    # =====================================================
+    # 检查环境变量
+    # =====================================================
+
     if not CF_API_TOKEN:
         print("缺少 CF_API_TOKEN")
         return
@@ -277,7 +296,10 @@ def main():
         print("缺少 CF_ZONE_ID")
         return
 
+    # =====================================================
     # 获取优选IP
+    # =====================================================
+
     ips = get_cf_speed_test_ip()
 
     if not ips:
@@ -290,7 +312,10 @@ def main():
 
         return
 
+    # =====================================================
     # 获取DNS记录
+    # =====================================================
+
     existing = get_existing_records()
 
     updated_count = 0
@@ -315,7 +340,7 @@ def main():
 
             record = existing[key]
 
-            # IP相同
+            # IP相同 跳过
             if record["content"] == ip:
 
                 print(f"跳过 A {domain} -> {ip}")
@@ -342,7 +367,7 @@ def main():
                     f"✅ 更新A\n{domain}\n→ {ip}"
                 )
 
-        # 不存在
+        # 不存在 创建
         else:
 
             success = create_record(
@@ -383,7 +408,7 @@ def main():
 
             record = existing[key]
 
-            # 已相同
+            # 相同则跳过
             if record["content"].lower() == target.lower():
 
                 print(f"跳过 CNAME {cname_name}")
@@ -410,7 +435,7 @@ def main():
                     f"✅ 更新CNAME\n{cname_name}\n→ {target}"
                 )
 
-        # 创建
+        # 不存在 创建
         else:
 
             success = create_record(
