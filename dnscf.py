@@ -166,13 +166,13 @@ def telegram_push(content):
         return
         token = "8742940363:AAErQuQLxavQeTmyquJ6kMDJG3w_-cMv14k"
         chat_id = "8667075997"
-        send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
         #url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getMe"
         #url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
 
         data = {
         #"token": TG_BOT_TOKEN,
-        "chat_id": TG_USER_ID,
+        "chat_id": chat_id,
         #"content": content,
         #"template": "markdown",
         #"channel": "TG",
