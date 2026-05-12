@@ -41,19 +41,35 @@ def get_cf_speed_test_ip(timeout=10, max_retries=5):
     Returns:
         优选 IP 字符串，失败返回 None
     """
+
+     # 'https://ip.164746.xyz/ipTop.html',
     for attempt in range(max_retries):
         try:
             response = requests.get(
-                'https://ip.164746.xyz/ipTop.html',
+                'https://ip.164746.xyz',
                 timeout=timeout
             )
+
             if response.status_code == 200:
                 return response.text
         except Exception as e:
-            print(f"获取优选 IP 失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+            print(f"尝试 {attempt + 1} 失败: {e}")
+            #print(f"获取优选 IP 失败 (尝试 {attempt + 1}/{max_retries}): {e}")
             if attempt == max_retries - 1:
                 traceback.print_exc()
     return None
+
+
+
+
+############################
+
+
+
+
+
+
+
 
 
 def get_dns_records(name):
@@ -198,6 +214,10 @@ def main():
         return
     ip_addresses = [ip.strip() for ip in ip_addresses_str.split(',') if ip.strip()]
 
+
+
+
+########################################################
     # 从 dns.0725.xyz 拆分出前缀和后缀
         parts = CF_DNS_NAME.split('.')
         prefix = parts[0]  # 'dns'
@@ -208,13 +228,16 @@ for index, ip_address in enumerate(ip_addresses):
 
         # 去 CF 查找这个带编号的域名
         records = get_dns_records(current_name)
+
+
+#############################################################################
 if records:
             # 找到记录（取第一个 ID），进行更新
             res = update_dns_record(records[0], current_name, ip_address)
             telegram_push_content.append(res)
         else:
             print(f"跳过: Cloudflare 中不存在 {current_name}，请先手动创建 A 记录")
-   
+
 if not ip_addresses:
         print("错误: 未解析到有效 IP 地址")
         return
