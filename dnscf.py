@@ -223,6 +223,11 @@ def main():
     # 发送推送
     #if push_plus_content:
     #  push_plus('\n'.join(push_plus_content))
+ results = []
+    ip_list = ip_list[:len(records)]
+    for i, ip in enumerate(ip_list):
+        res = update_dns_record(records[i], CF_DNS_NAME, ip)
+        results.append(res)
 
 if results:
         msg = '\n'.join(results)
