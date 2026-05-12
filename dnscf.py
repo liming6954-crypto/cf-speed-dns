@@ -222,9 +222,9 @@ def main():
     # 发送推送
     if telegram_push_content:
         # 将列表转为字符串
-        #full_content = '\n'.join(telegram_push_content)
-        full_content = telegram_push_content.append('\n'.join(telegram_push_content))
-        # 真正调用发送函数！！
+        full_content = '\n'.join(telegram_push_content)
+        #full_content = telegram_push_content.append('\n'.join(telegram_push_content))
+        # 调用发送函数！！
         telegram_push(full_content)
 
 if __name__ == '__main__':
