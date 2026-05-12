@@ -164,7 +164,8 @@ def telegram_push(content):
     if not TG_BOT_TOKEN or not TG_USER_ID:
         print("未配置 TG 推送")
         return
-        url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getMe"
+        #url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
 
         data = {
         #"token": TG_BOT_TOKEN,
