@@ -165,9 +165,9 @@ def telegram_push(content):
         print("未配置 TG 推送")
         return
   #  url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
-  #  url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getMe"
-    url = f"https://api.telegram.org/bot8742940363:AAErQuQLxavQeTmyquJ6kMDJG3w_-cMv14k/getMe"
-    data = {
+        url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getMe"
+    #url = f"https://api.telegram.org/bot8742940363:AAErQuQLxavQeTmyquJ6kMDJG3w_-cMv14k/getMe"
+        data = {
         #"token": TG_BOT_TOKEN,
         "chat_id": TG_USER_ID,
         #"content": content,
@@ -175,7 +175,7 @@ def telegram_push(content):
         #"channel": "TG",
         "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
         "parse_mode": "HTML"
-    }
+        }
     try:
         r = requests.post(url, json=data, timeout=DEFAULT_TIMEOUT)
         if r.status_code == 200:
