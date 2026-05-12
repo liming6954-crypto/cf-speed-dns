@@ -166,7 +166,7 @@ def telegram_push(content):
         return
     url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
     data = {
-        "token": TG_BOT_TOKEN
+        "token": TG_BOT_TOKEN,
         "chat_id": TG_USER_ID,
         "content": content,
         "template": "markdown",
