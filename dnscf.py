@@ -18,6 +18,11 @@ CF_ZONE_ID = os.environ.get("CF_ZONE_ID")
 CF_DNS_NAME = os.environ.get("CF_DNS_NAME")
 PUSHPLUS_TOKEN = os.environ.get("PUSHPLUS_TOKEN")
 
+# Telegram 配置
+TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
+TG_USER_ID = os.environ.get("TG_USER_ID")
+
+
 # 请求头
 HEADERS = {
     'Authorization': f'Bearer {CF_API_TOKEN}',
@@ -130,6 +135,26 @@ def update_dns_record(record_info, name, cf_ip):
         current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         print(f"cf_dns_change ERROR: ---- Time: {current_time} ---- MESSAGE: {e}")
         return f"ip:{cf_ip} 解析 {name} 失败"
+
+
+def telegram_push(content):
+    """发送 Telegram 消息"""
+    if not TG_BOT_TOKEN or not TG_USER_ID:
+        print("未配置 TG_BOT_TOKEN 或 TG_USER_ID，跳过推送")
+        return
+
+    url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
+    data = {
+        "chat_id": TG_USER_ID,
+        "text": f"🚀 <b>Cloudflare IP 自动更新</b>\n\n{content}",
+        "parse_mode": "HTML"
+    }
+    try:
+        requests.post(url, json=data, timeout=DEFAULT_TIMEOUT)
+        print("Telegram 消息推送成功")
+    except Exception as e:
+        print(f"Telegram 推送失败: {e}")
+
 
 
 def push_plus(content):
