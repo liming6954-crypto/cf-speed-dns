@@ -161,24 +161,40 @@ def update_dns_record(record_info, name, cf_ip):
  #  except Exception as e:
    #     print(f"消息推送失败: {e}")
 def telegram_push(content):
-    if not TG_BOT_TOKEN or not TG_USER_ID:
-        print("未配置 TG 推送")
+    token = os.environ.get("TG_BOT_TOKEN")
+    chat_id = os.environ.get("TG_USER_ID")
+    
+    # 如果没有环境变量，直接退出
+    if not token or not chat_id:
+        print("TG 配置缺失")
         return
-        token = "8742940363:AAErQuQLxavQeTmyquJ6kMDJG3w_-cMv14k"
-        chat_id = "8667075997"
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        #url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getMe"
+
+    # 第二步：确保变量名就叫 url
+    url = f"https://telegram.org{token}/sendMessage"
+    
+    payload = {
+        "chat_id": chat_id,
+        "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
+        "parse_mode": "HTML"
+    }
+    #if not TG_BOT_TOKEN or not TG_USER_ID:
+    #   print("未配置 TG 推送")
+    #    return
+     #   token = "8742940363:AAErQuQLxavQeTmyquJ6kMDJG3w_-cMv14k"
+      #  chat_id = "8667075997"
+      #  url = f"https://api.telegram.org/bot{token}/sendMessage"
+      #  #url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/getMe"
         #url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
 
-        data = {
+       # data = {
         #"token": TG_BOT_TOKEN,
-        "chat_id": chat_id,
+       # "chat_id": chat_id,
         #"content": content,
         #"template": "markdown",
         #"channel": "TG",
-        "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
-        "parse_mode": "HTML"
-        }
+       # "text": f"🚀 <b>CF IP 自动更新</b>\n\n{content}",
+       # "parse_mode": "HTML"
+      #  }
     try:
         r = requests.post(url, json=data, timeout=DEFAULT_TIMEOUT)
         if r.status_code == 200:
