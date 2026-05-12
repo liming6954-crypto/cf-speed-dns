@@ -170,7 +170,7 @@ def telegram_push(content):
         return
 
     # 第二步：确保变量名就叫 url
-    url = f"https://api.telegram.org/bot{token}/getMe"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
     
     data = {
         "chat_id": chat_id,
