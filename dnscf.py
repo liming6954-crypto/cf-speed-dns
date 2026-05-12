@@ -37,7 +37,6 @@ def is_valid_ipv4(ip: str) -> bool:
 def get_cf_speed_test_ip():
     """获取优选 IP，支持多个备用源"""
     sources = [
-        'https://ip.164746.xyz',
         'https://ip.164746.xyz/ipTop.html',
     ]
 
