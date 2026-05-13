@@ -5,9 +5,11 @@ import traceback
 
 CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
 CF_ZONE_ID = os.environ.get("CF_ZONE_ID")
+CF_ZONE_ID_2 = os.environ.get("CF_ZONE_ID_2")
 TG_CHAT_ID = os.environ.get("TG_CHAT_ID") or os.environ.get("TG_USER_ID")
 TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
 DOMAIN_ROOT = "072503.xyz"
+DOMAIN_ROOT_2 = "saas.sin.fan"
 MAX_TOTAL_RECORDS = 10
 MAX_A_RECORDS = 4
 
@@ -26,7 +28,13 @@ CNAME_RECORDS = [
     ("cf4", "mfa.gov.ua",     1),
 ]
 
+CNAME_RECORDS_2 = [
+    ("cf1", "www.visa.cn",    0),
+    ("cf2", "store.ubi.com",  1),
+]
+
 BASE_URL = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/dns_records"
+BASE_URL_2 = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID_2}/dns_records"
 HEADERS = {
     "Authorization": f"Bearer {CF_API_TOKEN}",
     "Content-Type": "application/json"
@@ -79,13 +87,13 @@ def get_cf_speed_test_ip():
     return all_ips
 
 
-def get_existing_records():
+def get_existing_records(base_url):
     all_records = []
     page = 1
     try:
         while True:
             resp = requests.get(
-                BASE_URL,
+                base_url,
                 headers=HEADERS,
                 params={"per_page": 100, "page": page},
                 timeout=15
@@ -108,7 +116,7 @@ def get_existing_records():
     return all_records
 
 
-def create_record(record_type, name, content, proxied=False):
+def create_record(base_url, record_type, name, content, proxied=False):
     try:
         data = {
             "type": record_type,
@@ -117,7 +125,7 @@ def create_record(record_type, name, content, proxied=False):
             "ttl": 60,
             "proxied": proxied
         }
-        resp = requests.post(BASE_URL, headers=HEADERS, json=data, timeout=15)
+        resp = requests.post(base_url, headers=HEADERS, json=data, timeout=15)
         result = resp.json()
         if result.get("success"):
             print(f"创建 {record_type} {name} -> {content}")
@@ -129,9 +137,9 @@ def create_record(record_type, name, content, proxied=False):
         return False
 
 
-def update_record(record_id, record_type, name, content, proxied=False):
+def update_record(base_url, record_id, record_type, name, content, proxied=False):
     try:
-        url = f"{BASE_URL}/{record_id}"
+        url = f"{base_url}/{record_id}"
         data = {
             "type": record_type,
             "name": name,
@@ -151,9 +159,9 @@ def update_record(record_id, record_type, name, content, proxied=False):
         return False
 
 
-def delete_record(record_id):
+def delete_record(base_url, record_id):
     try:
-        url = f"{BASE_URL}/{record_id}"
+        url = f"{base_url}/{record_id}"
         resp = requests.delete(url, headers=HEADERS, timeout=15)
         result = resp.json()
         if result.get("success"):
@@ -170,8 +178,76 @@ def ip_to_dash(ip):
     return ip.replace(".", "-")
 
 
-def cname_record_name(ip, cf_tag):
-    return f"{ip_to_dash(ip)}.{cf_tag}.{DOMAIN_ROOT}"
+def cname_record_name(ip, cf_tag, domain_root):
+    return f"{ip_to_dash(ip)}.{cf_tag}.{domain_root}"
+
+
+def process_cname(base_url, domain_root, cname_records, ips, existing, current_total_records, tg_results):
+    updated_count = 0
+    existing_cname_map = {}
+    for r in existing:
+        if r["type"] == "CNAME":
+            existing_cname_map[r["name"].lower()] = r
+
+    desired_cname = []
+    for cf_tag, target, ip_index in cname_records:
+        ip = ips[ip_index % len(ips)]
+        expected_name = cname_record_name(ip, cf_tag, domain_root).lower()
+        desired_cname.append((expected_name, target, cf_tag, ip))
+
+    desired_cname_names = {name for name, _, _, _ in desired_cname}
+
+    existing_cname_by_tag = {}
+    for name_lower, r in existing_cname_map.items():
+        for tag in {t for _, _, t, _ in desired_cname}:
+            suffix = f".{tag}.{domain_root}".lower()
+            if name_lower.endswith(suffix):
+                existing_cname_by_tag.setdefault(tag, []).append(r)
+                break
+
+    for expected_name, target, cf_tag, ip in desired_cname:
+        existing_record = existing_cname_map.get(expected_name)
+        if existing_record:
+            if existing_record["content"].lower() == target.lower():
+                print(f"跳过 CNAME {expected_name}")
+                tg_results.append(f"跳过CNAME\n{expected_name}")
+            else:
+                success = update_record(base_url, existing_record["id"], "CNAME", existing_record["name"], target)
+                if success:
+                    updated_count += 1
+                    tg_results.append(f"更新CNAME\n{expected_name}\n-> {target}")
+        else:
+            old_records = existing_cname_by_tag.get(cf_tag, [])
+            old_to_remove = None
+            for r in old_records:
+                if r["name"].lower() not in desired_cname_names:
+                    old_to_remove = r
+                    break
+            if old_to_remove:
+                print(f"IP变化，重建CNAME: {old_to_remove['name']} -> {expected_name}")
+                if delete_record(base_url, old_to_remove["id"]):
+                    success = create_record(base_url, "CNAME", expected_name, target)
+                    if success:
+                        existing_cname_map.pop(old_to_remove["name"].lower(), None)
+                        existing_cname_map[expected_name] = {"id": "new", "type": "CNAME", "name": expected_name, "content": target}
+                        old_records.remove(old_to_remove)
+                        old_records.append({"id": "new", "type": "CNAME", "name": expected_name, "content": target})
+                        updated_count += 1
+                        tg_results.append(f"重建CNAME\n{expected_name}\n-> {target}")
+            else:
+                if current_total_records >= MAX_TOTAL_RECORDS:
+                    print(f"DNS记录达到上限 跳过 {expected_name}")
+                    tg_results.append(f"DNS记录达到上限\n{expected_name}")
+                    continue
+                success = create_record(base_url, "CNAME", expected_name, target)
+                if success:
+                    current_total_records += 1
+                    updated_count += 1
+                    existing_cname_map[expected_name] = {"id": "new", "type": "CNAME", "name": expected_name, "content": target}
+                    existing_cname_by_tag.setdefault(cf_tag, []).append({"id": "new", "type": "CNAME", "name": expected_name, "content": target})
+                    tg_results.append(f"创建CNAME\n{expected_name}\n-> {target}")
+
+    return updated_count, current_total_records
 
 
 def main():
@@ -182,35 +258,38 @@ def main():
     if not CF_ZONE_ID:
         print("缺少环境变量 CF_ZONE_ID")
         return
+
     ips = get_cf_speed_test_ip()
     if not ips:
         msg = "未获取到优选IP"
         print(msg)
         send_telegram(msg)
         return
-    existing = get_existing_records()
+
+    # ========== 072503.xyz ==========
+    print("\n========== 072503.xyz A记录 ==========\n")
+    existing = get_existing_records(BASE_URL)
     existing_a_map = {}
     for r in existing:
         if r["type"] == "A":
             key = (r["name"].lower(), r["content"])
             existing_a_map[key] = r
-    existing_cname_map = {}
-    for r in existing:
-        if r["type"] == "CNAME":
-            existing_cname_map[r["name"].lower()] = r
+
     updated_count = 0
     current_total_records = len(existing)
     current_a_records = len([r for r in existing if r["type"] == "A"])
-    print("\n========== A记录 ==========\n")
+
     desired_a = []
     for domain, ip_index in A_RECORDS:
         ip = ips[ip_index % len(ips)]
         desired_a.append((domain.lower(), ip))
+
     existing_a_set = set(existing_a_map.keys())
     desired_a_set = set(desired_a)
     existing_a_by_name = {}
     for (name, ip), r in existing_a_map.items():
         existing_a_by_name.setdefault(name, []).append(r)
+
     for domain_lower, ip in desired_a:
         if (domain_lower, ip) in existing_a_set:
             print(f"跳过 A {domain_lower} -> {ip}")
@@ -224,7 +303,7 @@ def main():
                     record_to_update = r
                     break
             if record_to_update:
-                success = update_record(record_to_update["id"], "A", domain_lower, ip)
+                success = update_record(BASE_URL, record_to_update["id"], "A", domain_lower, ip)
                 if success:
                     old_key = (domain_lower, record_to_update["content"])
                     existing_a_map.pop(old_key, None)
@@ -239,7 +318,7 @@ def main():
                     tg_results.append(f"更新A\n{domain_lower}\n-> {ip}")
             else:
                 if current_a_records < MAX_A_RECORDS and current_total_records < MAX_TOTAL_RECORDS:
-                    success = create_record("A", domain_lower, ip)
+                    success = create_record(BASE_URL, "A", domain_lower, ip)
                     if success:
                         current_a_records += 1
                         current_total_records += 1
@@ -258,7 +337,7 @@ def main():
                 print(f"DNS记录达到上限 跳过 {domain_lower}")
                 tg_results.append(f"DNS记录达到上限\n{domain_lower}")
                 continue
-            success = create_record("A", domain_lower, ip)
+            success = create_record(BASE_URL, "A", domain_lower, ip)
             if success:
                 current_a_records += 1
                 current_total_records += 1
@@ -268,76 +347,38 @@ def main():
                 existing_a_by_name.setdefault(domain_lower, []).append(new_record)
                 existing_a_map[(domain_lower, ip)] = new_record
                 tg_results.append(f"创建A\n{domain_lower}\n-> {ip}")
-    print("\n========== CNAME ==========\n")
-    desired_cname = []
-    for cf_tag, target, ip_index in CNAME_RECORDS:
-        ip = ips[ip_index % len(ips)]
-        expected_name = cname_record_name(ip, cf_tag).lower()
-        desired_cname.append((expected_name, target, cf_tag, ip))
-    desired_cname_names = {name for name, _, _, _ in desired_cname}
-    existing_cname_by_tag = {}
-    for name_lower, r in existing_cname_map.items():
-        for tag in {t for _, _, t, _ in desired_cname}:
-            suffix = f".{tag}.{DOMAIN_ROOT}".lower()
-            if name_lower.endswith(suffix):
-                existing_cname_by_tag.setdefault(tag, []).append(r)
-                break
-    for expected_name, target, cf_tag, ip in desired_cname:
-        existing_record = existing_cname_map.get(expected_name)
-        if existing_record:
-            if existing_record["content"].lower() == target.lower():
-                print(f"跳过 CNAME {expected_name}")
-                tg_results.append(f"跳过CNAME\n{expected_name}")
-            else:
-                success = update_record(existing_record["id"], "CNAME", existing_record["name"], target)
-                if success:
-                    updated_count += 1
-                    tg_results.append(f"更新CNAME\n{expected_name}\n-> {target}")
-        else:
-            old_records = existing_cname_by_tag.get(cf_tag, [])
-            old_to_remove = None
-            for r in old_records:
-                if r["name"].lower() not in desired_cname_names:
-                    old_to_remove = r
-                    break
-            if old_to_remove:
-                print(f"IP变化，重建CNAME: {old_to_remove['name']} -> {expected_name}")
-                if delete_record(old_to_remove["id"]):
-                    success = create_record("CNAME", expected_name, target)
-                    if success:
-                        existing_cname_map.pop(old_to_remove["name"].lower(), None)
-                        existing_cname_map[expected_name] = {"id": "new", "type": "CNAME", "name": expected_name, "content": target}
-                        old_records.remove(old_to_remove)
-                        old_records.append({"id": "new", "type": "CNAME", "name": expected_name, "content": target})
-                        updated_count += 1
-                        tg_results.append(f"重建CNAME\n{expected_name}\n-> {target}")
-            else:
-                if current_total_records >= MAX_TOTAL_RECORDS:
-                    print(f"DNS记录达到上限 跳过 {expected_name}")
-                    tg_results.append(f"DNS记录达到上限\n{expected_name}")
-                    continue
-                success = create_record("CNAME", expected_name, target)
-                if success:
-                    current_total_records += 1
-                    updated_count += 1
-                    existing_cname_map[expected_name] = {"id": "new", "type": "CNAME", "name": expected_name, "content": target}
-                    existing_cname_by_tag.setdefault(cf_tag, []).append({"id": "new", "type": "CNAME", "name": expected_name, "content": target})
-                    tg_results.append(f"创建CNAME\n{expected_name}\n-> {target}")
+
+    print("\n========== 072503.xyz CNAME ==========\n")
+    cname_updated, current_total_records = process_cname(
+        BASE_URL, DOMAIN_ROOT, CNAME_RECORDS, ips, existing, current_total_records, tg_results
+    )
+    updated_count += cname_updated
+
+    # ========== saas.sin.fan ==========
+    if CF_ZONE_ID_2:
+        print("\n========== saas.sin.fan CNAME ==========\n")
+        existing_2 = get_existing_records(BASE_URL_2)
+        current_total_records_2 = len(existing_2)
+        cname_updated_2, _ = process_cname(
+            BASE_URL_2, DOMAIN_ROOT_2, CNAME_RECORDS_2, ips, existing_2, current_total_records_2, tg_results
+        )
+        updated_count += cname_updated_2
+    else:
+        print("缺少环境变量 CF_ZONE_ID_2，跳过 saas.sin.fan")
+
+    # ========== 汇总 ==========
     print("\n==============================")
     print(f"更新数量: {updated_count}")
-    print(f"当前DNS记录数: {current_total_records}")
     print("==============================")
     try:
         if tg_results:
             message = (
                 f"DNS自动更新完成\n\n"
-                f"域名: {DOMAIN_ROOT}\n"
-                f"更新数量: {updated_count}\n"
-                f"当前DNS记录数: {current_total_records}\n\n"
+                f"更新数量: {updated_count}\n\n"
                 + "\n\n".join(tg_results[:20])
             )
         else:
-            message = f"DNS检查完成\n\n{DOMAIN_ROOT}\n无需更新"
+            message = "DNS检查完成\n无需更新"
         if len(message) > 4000:
             chunks = [message[i:i+4000] for i in range(0, len(message), 4000)]
             for chunk in chunks:
