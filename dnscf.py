@@ -20,9 +20,8 @@ A_RECORDS = [
 
 CNAME_RECORDS = [
     ("cf1", "www.visa.cn",    0),
-    ("cf1", "www.visa.cn",    1),
-    ("cf2", "store.ubi.com",  0),
-    ("cf3", "www.shopify.com", 1),
+    ("cf2", "store.ubi.com",  1),
+    ("cf3", "www.shopify.com", 0),
     ("cf4", "mfa.gov.ua",     1),
     ("cf5", "saas.sin.fan",   0),
 ]
