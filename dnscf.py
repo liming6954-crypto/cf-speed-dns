@@ -368,6 +368,37 @@ def delete_custom_hostname(ch_id, hostname=""):
         traceback.print_exc()
         return False
 
+def check_and_fix_custom_hostname(hostname, ch_data):
+    """检查 Custom Hostname 的 SSL 状态，失败则重新验证"""
+    ssl_status = ch_data.get("ssl", {}).get("status", "")
+    ssl_method = ch_data.get("ssl", {}).get("method", "")
+
+    if ssl_status == "active":
+        print(f"SSL正常: {hostname}")
+        return False
+
+    print(f"SSL异常: {hostname} 状态={ssl_status} 方法={ssl_method}")
+
+    # 重新验证 SSL
+    if ssl_status in ("pending_validation", "validation_failed", "expired", "inactive"):
+        try:
+            url = f"{CH_BASE_URL}/{ch_data['id']}"
+            data = {"ssl": {"method": "http", "type": "dv", "wildcard": False}}
+            resp = requests.patch(url, headers=HEADERS, json=data, timeout=15)
+            result = resp.json()
+            if result.get("success"):
+                print(f"重新验证SSL: {hostname}")
+                return True
+            else:
+                print(f"重新验证SSL失败: {hostname}")
+                print(result)
+                return False
+        except Exception:
+            traceback.print_exc()
+            return False
+    return False
+
+
 # ==================== 主逻辑 ====================
 
 def main():
@@ -557,11 +588,21 @@ def main():
                 updated_count += 1
                 existing_cname_map[cname_name] = {"id": "new", "type": "CNAME", "name": cname_name, "content": target}
                 tg_results.append(f"创建CNAME\n{cname_name}\n-> {target}")
+
         # 确保 Custom Hostname 存在
         if cname_name not in ch_map:
             if create_custom_hostname(cname_name):
                 updated_count += 1
                 tg_results.append(f"创建CH\n{cname_name}")
+        else:
+            # 检查已有 Custom Hostname 的 SSL 状态
+            ch_data = ch_map[cname_name]
+            if check_and_fix_custom_hostname(cname_name, ch_data):
+                updated_count += 1
+                ssl_status = ch_data.get("ssl", {}).get("status", "unknown")
+                tg_results.append(f"重新验证SSL\n{cname_name}\n状态: {ssl_status}")
+
+
 
     # ==================== 清理孤立 Custom Hostname ====================
     print("\n========== 清理孤立 Custom Hostname ==========\n")
@@ -653,6 +694,15 @@ def main():
                 for r in created_ch:
                     parts = r.split("\n")
                     lines.append(f"  ➕ {parts[-1]}")
+
+            # SSL重新验证
+            ssl_fixed = [r for r in tg_results if r.startswith("重新验证SSL")]
+            if ssl_fixed:
+                lines.append(f"\n🔐 <b>SSL重新验证 ({len(ssl_fixed)})</b>")
+                for r in ssl_fixed:
+                    parts = r.split("\n")
+                    lines.append(f"  🔄 {parts[1]} ({parts[2] if len(parts) > 2 else ''})")
+
 
             # 清理
             if cleaned or deleted:
