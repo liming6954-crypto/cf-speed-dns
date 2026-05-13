@@ -26,9 +26,32 @@ PROXIED_A_NAMES = {
 
 # 优选IP的A记录，格式：(子域名, ipTop.html返回的IP索引)
 A_RECORDS = [
+    # ip.164746.xyz 的IP（综合优选）
     ("dns.072503.xyz",  0),                         # 优选IP入口1（IP[0]）
     ("dns.072503.xyz",  1),                         # 优选IP入口2（IP[1]）
     ("custom-hostname-fallback.072503.xyz", 0),     # SaaS fallback辅助（IP[0]）
+
+    ####################################反代 ip##################################
+    # 电信优选IP
+    ("ct.072503.xyz",  0),                          # 电信IP[0]
+    ("ct.072503.xyz",  1),                          # 电信IP[1]
+    ("ct.072503.xyz",  2),                          # 电信IP[2]
+
+    # 联通优选IP
+    ("cu.072503.xyz",  0),                          # 联通IP[0]
+    ("cu.072503.xyz",  1),                          # 联通IP[1]
+    ("cu.072503.xyz",  2),                          # 联通IP[2]
+
+    # 移动优选IP
+    ("cmcc.072503.xyz", 0),                         # 移动IP[0]
+    ("cmcc.072503.xyz", 1),                         # 移动IP[1]
+    ("cmcc.072503.xyz", 2),                         # 移动IP[2]
+
+    # 反代IP
+    ("proxy.072503.xyz", 0),                        # 反代IP[0]
+    ("proxy.072503.xyz", 1),                        # 反代IP[1]
+    ("proxy.072503.xyz", 2),                        # 反代IP[2]
+    ######################################################################################
 ]
 
 # 直接CNAME记录（不走SaaS，不需要Custom Hostname，IP自动跟随目标域名）
@@ -41,14 +64,79 @@ DIRECT_CNAME_RECORDS = [
 # 格式：(标签, 优选域名)，生成记录名如：cf1.072503.xyz → www.visa.cn
 CNAME_RECORDS = [
     ("cf1", "www.visa.cn"),       # 优选域名1
+
+    ####育碧(Ubisoft)官方商店域名，使用 CloudFlare CDN 服务。作为全球知名游戏厂商的商店域名，线路质量可靠，稳定性好。#########
     ("cf2", "store.ubi.com"),     # 优选域名2
+    ##################################################################################################################
+
+
+    ####全球知名电商建站平台 Shopify 官方域名，使用 CloudFlare 企业级 CDN。商业平台域名，线路质量优秀，全球节点覆盖广泛。#######
     ("cf3", "www.shopify.com"),   # 优选域名3
+    ###################################################################################################################
+
+    #####乌克兰外交部官方域名，采用 CloudFlare CDN 服务。作为政府官网，域名信誉度高，稳定性好，适合长期使用。###################
     ("cf4", "mfa.gov.ua"),        # 优选域名4
+    ###################################################################################################################
+
+
+
+    ###########################  MIYU维护 网址：https://saas.sin.fan/ #############################
     ("cf5", "saas.sin.fan"),      # 优选域名5
+    ##############################################################################################
+
+
+    ###########################   秋名山维护 网址: https://www.qmsdh.com/  #####################
     ("cf6", "cf.877774.xyz"),     # 三网自适应
+    ###############################################################################################
     ("cf7", "asia.877774.xyz"),   # 亚洲优选
     ("cf8", "eur.877774.xyz"),    # 欧洲优选
     ("cf9", "na.877774.xyz"),     # 美洲优选
+    ##############################################################################################
+
+
+    ##############################  fishcpy维护 网址:  https://www.byoip.top/#############
+    ("cf10", "cloudflare-dl.byoip.top"),      #一级域名
+    ################################################################################################
+    ("cf11", "cloudflare.19931110.xyz"),    #CloudFlare 单IPv4版    #全球加速   高可用    --#泛域名  
+    ("cf12", "cf.cnae.top"),                 #CloudFlare 带IPv6版   #全球加速   双栈      --#泛域名 
+    ("cf13", "edgeone.19931110.xyz"),        #EdgeOne CDN 优选服务   #Tencent 全球优化    --#泛域名 
+    ("cf14", "netlify.19931110.xyz"),        #Netlify CDN 优选服务  #AWS  全球优化        --#泛域名 
+    ("cf15", "vercel.19931110.xyz"),         #Vercel CDN 优选服务     #AWS    全球优化    --#泛域名 
+    ###############################################################################################
+
+
+
+    #############   WeTest.Vip维护   网址: https://www.wetest.vip/#########################################
+    ("cf16", "cloudflare.182682.xyz"),    #IPV4&6 全网、移动、联通、电信 15IP/15分钟   CloudFlare官方IP优选
+    ("cf17", "cloudfront.182682.xyz"),    #IPV4&6  全网、移动、联通、电信 15IP/15分钟   CloudFlare官方IP优选
+    ("cf18", "edgeone.182682.xyz"),       #IPV4&6  全网、移动、联通、电信 15IP/15分钟   EdgeOne官方IP优选
+    #####################################################################################################
+
+
+
+    ############################# ktff维护  优质的优选域名##############################################
+    ("cf19", "cf.tencentapp.cn"),
+    ###################################################################################################
+
+
+    ########    NexusMods 静态资源分发域名，全球最大的游戏MOD社区。采用 CloudFlare CDN，资源分发网络覆盖全球，访问稳定。##############
+    ("cf20", "staticdelivery.nexusmods.com"),
+    #####################################################################################################################
+
+
+    #########################################   https://time.is 官方优选#######################################################
+    ("cf21", "time.is"),
+    ################################################################################################################
+
+
+    ############################################    icook.hk#官方优选   #################################################
+    ("cf22", "icook.hk"),
+    ###################################################################################################################
+
+
+    ############################################    icook.tw#官方优选   ################################################
+    ("cf23", "icook.tw"),
+    ######################################################################################################################
 ]
 
 # DNS记录总数上限（免费版最多200条，设50留余量）
@@ -112,6 +200,48 @@ def get_cf_speed_test_ip():
             traceback.print_exc()
     print(f"获取到 {len(all_ips)} 个优选IP")
     return all_ips
+
+def get_isp_ips(isp, count=6):
+    """从 cf.090227.xyz 按运营商获取优选IP"""
+    url = f"https://cf.090227.xyz/{isp}?ips={count}"
+    ips = []
+    try:
+        print(f"获取{isp}优选IP: {url}")
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        for line in r.text.strip().splitlines():
+            ip = line.split("#")[0].strip()
+            if is_valid_ipv4(ip) and ip not in ips:
+                ips.append(ip)
+    except Exception:
+        print(f"获取{isp}优选IP失败: {url}")
+        traceback.print_exc()
+    print(f"获取到 {len(ips)} 个{isp}优选IP")
+    return ips
+
+
+def get_bestproxy_ips(count=6):
+    """从 ipdb.api.030101.xyz 获取反代IP"""
+    url = f"https://ipdb.api.030101.xyz/?type=bestproxy&country=true"
+    ips = []
+    try:
+        print(f"获取反代IP: {url}")
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        for line in r.text.strip().splitlines():
+            ip = line.split("#")[0].strip()
+            if is_valid_ipv4(ip) and ip not in ips:
+                ips.append(ip)
+                if len(ips) >= count:
+                    break
+    except Exception:
+        print(f"获取反代IP失败: {url}")
+        traceback.print_exc()
+    print(f"获取到 {len(ips)} 个反代IP")
+    return ips
+
+
+
 
 # ==================== DNS 记录操作 ====================
 
@@ -181,7 +311,6 @@ def delete_record(record_id):
     except Exception:
         traceback.print_exc()
         return False
-
 # ==================== Custom Hostname 操作 ====================
 
 CH_BASE_URL = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/custom_hostnames"
@@ -250,11 +379,31 @@ def main():
         print("缺少环境变量 CF_ZONE_ID")
         return
 
-    # 1. 获取优选IP
-    ips = get_cf_speed_test_ip()
-    if not ips:
-        send_telegram("未获取到优选IP")
+    # 1. 分别获取优选IP
+    ips = get_cf_speed_test_ip()          # ip.164746.xyz 综合优选
+    ct_ips = get_isp_ips("ct", 6)         # 电信优选
+    cu_ips = get_isp_ips("cu", 6)         # 联通优选
+    cmcc_ips = get_isp_ips("cmcc", 6)     # 移动优选
+    proxy_ips = get_bestproxy_ips(6)      # 反代IP
+
+    if not ips and not ct_ips and not cu_ips and not cmcc_ips and not proxy_ips:
+        send_telegram("❌ 未获取到任何优选IP")
         return
+    # 部分API失败时通知
+    warnings = []
+    if not ips:
+        warnings.append("ip.164746.xyz 获取失败")
+    if not ct_ips:
+        warnings.append("电信优选IP获取失败")
+    if not cu_ips:
+        warnings.append("联通优选IP获取失败")
+    if not cmcc_ips:
+        warnings.append("移动优选IP获取失败")
+    if not proxy_ips:
+        warnings.append("反代IP获取失败")
+    if warnings:
+        print(f"警告: {', '.join(warnings)}")
+
 
     # 2. 获取现有 DNS 记录
     existing = get_existing_records()
@@ -281,8 +430,20 @@ def main():
 
     desired_a = []
     for domain, ip_index in A_RECORDS:
-        ip = ips[ip_index % len(ips)]
-        desired_a.append((domain.lower(), ip))
+        if domain.startswith("ct."):
+            ip_list = ct_ips
+        elif domain.startswith("cu."):
+            ip_list = cu_ips
+        elif domain.startswith("cmcc."):
+            ip_list = cmcc_ips
+        elif domain.startswith("proxy."):
+            ip_list = proxy_ips
+        else:
+            ip_list = ips
+        if ip_list:
+            ip = ip_list[ip_index % len(ip_list)]
+            desired_a.append((domain.lower(), ip))
+
 
     existing_a_set = set(existing_a_map.keys())
     desired_a_set = set(desired_a)
@@ -330,13 +491,15 @@ def main():
                 current_total_records += 1
                 updated_count += 1
                 existing_a_set.add((domain_lower, ip))
+
+                # 注意：id="new" 是占位符，仅用于本轮循环的内存状态追踪，不会用于API调用
                 new_record = {"id": "new", "type": "A", "name": domain_lower, "content": ip, "proxied": proxied}
+
                 existing_a_by_name.setdefault(domain_lower, []).append(new_record)
                 existing_a_map[(domain_lower, ip)] = new_record
                 tg_results.append(f"创建A\n{domain_lower}\n-> {ip}")
 
     # ==================== 直接 CNAME 处理 ====================
-    # dns1/dns2 指向 saas.sin.fan，不走SaaS，不需要Custom Hostname
     print("\n========== 直接CNAME ==========\n")
 
     for name, target in DIRECT_CNAME_RECORDS:
@@ -351,7 +514,6 @@ def main():
                     updated_count += 1
                     tg_results.append(f"更新CNAME\n{name_lower}\n-> {target}")
         else:
-            # 同名A记录存在则删除，改为CNAME
             same_name_a = existing_a_by_name.get(name_lower, [])
             if same_name_a:
                 for r in same_name_a:
@@ -370,7 +532,6 @@ def main():
                 tg_results.append(f"创建CNAME\n{name_lower}\n-> {target}")
 
     # ==================== SaaS CNAME + Custom Hostname 处理 ====================
-    # 记录名不含IP（如 cf1.072503.xyz），IP变化时无需重建
     print("\n========== SaaS CNAME + Custom Hostname ==========\n")
 
     desired_cname_names = set()
@@ -433,16 +594,93 @@ def main():
     print("==============================")
 
     try:
-        if tg_results:
-            message = (
-                f"DNS自动更新完成\n\n"
-                f"域名: {DOMAIN_ROOT}\n"
-                f"更新数量: {updated_count}\n"
-                f"当前DNS记录数: {current_total_records}\n\n"
-                + "\n\n".join(tg_results[:20])
-            )
+        # 按类型分类统计
+        created_a = [r for r in tg_results if r.startswith("创建A")]
+        updated_a = [r for r in tg_results if r.startswith("更新A")]
+        skipped_a = [r for r in tg_results if r.startswith("跳过A")]
+        created_cname = [r for r in tg_results if r.startswith("创建CNAME")]
+        updated_cname = [r for r in tg_results if r.startswith("更新CNAME")]
+        skipped_cname = [r for r in tg_results if r.startswith("跳过CNAME")]
+        created_ch = [r for r in tg_results if r.startswith("创建CH")]
+        cleaned = [r for r in tg_results if r.startswith("清理")]
+        deleted = [r for r in tg_results if r.startswith("删除")]
+        warnings_list = [r for r in tg_results if r.startswith("DNS记录达到上限")]
+
+        if not tg_results:
+            message = f"✅ DNS检查完成\n\n<b>域名:</b> {DOMAIN_ROOT}\n<b>状态:</b> 无需更新"
         else:
-            message = f"DNS检查完成\n\n{DOMAIN_ROOT}\n无需更新"
+            lines = []
+            lines.append(f"🔄 <b>DNS自动更新完成</b>\n")
+            lines.append(f"<b>域名:</b> {DOMAIN_ROOT}")
+            lines.append(f"<b>更新数量:</b> {updated_count}")
+            lines.append(f"<b>DNS记录数:</b> {current_total_records}\n")
+
+            # IP来源信息
+            lines.append("📡 <b>IP来源:</b>")
+            if ips:
+                lines.append(f"  综合: {ips[0]}")
+            if ct_ips:
+                lines.append(f"  电信: {', '.join(ct_ips[:2])}")
+            if cu_ips:
+                lines.append(f"  联通: {', '.join(cu_ips[:2])}")
+            if cmcc_ips:
+                lines.append(f"  移动: {', '.join(cmcc_ips[:2])}")
+            if proxy_ips:
+                lines.append(f"  反代: {', '.join(proxy_ips[:2])}")
+            # A记录变更
+            if created_a or updated_a:
+                lines.append(f"\n🟢 <b>A记录变更 ({len(created_a) + len(updated_a)})</b>")
+                for r in created_a:
+                    parts = r.split("\n")
+                    lines.append(f"  ➕ {' → '.join(parts[1:])}")
+                for r in updated_a:
+                    parts = r.split("\n")
+                    lines.append(f"  ✏️ {' → '.join(parts[1:])}")
+
+            # CNAME变更
+            if created_cname or updated_cname:
+                lines.append(f"\n🔵 <b>CNAME变更 ({len(created_cname) + len(updated_cname)})</b>")
+                for r in created_cname:
+                    parts = r.split("\n")
+                    lines.append(f"  ➕ {' → '.join(parts[1:])}")
+                for r in updated_cname:
+                    parts = r.split("\n")
+                    lines.append(f"  ✏️ {' → '.join(parts[1:])}")
+
+            # Custom Hostname
+            if created_ch:
+                lines.append(f"\n🔒 <b>Custom Hostname ({len(created_ch)})</b>")
+                for r in created_ch:
+                    parts = r.split("\n")
+                    lines.append(f"  ➕ {parts[-1]}")
+
+            # 清理
+            if cleaned or deleted:
+                lines.append(f"\n🗑️ <b>清理 ({len(cleaned) + len(deleted)})</b>")
+                for r in cleaned + deleted:
+                    parts = r.split("\n")
+                    lines.append(f"  ❌ {parts[-1]}")
+
+            # 警告
+            if warnings_list:
+                lines.append(f"\n⚠️ <b>警告 ({len(warnings_list)})</b>")
+                for r in warnings_list:
+                    parts = r.split("\n")
+                    lines.append(f"  ⚠️ {parts[-1]}")
+
+            # API失败警告
+            if warnings:
+                lines.append(f"\n⚠️ <b>API失败:</b>")
+                for w in warnings:
+                    lines.append(f"  ❌ {w}")
+
+            # 跳过统计
+            skip_count = len(skipped_a) + len(skipped_cname)
+            if skip_count > 0:
+                lines.append(f"\n⏭️ <b>跳过:</b> {skip_count}条（无变化）")
+
+            message = "\n".join(lines)
+
         if len(message) > 4000:
             chunks = [message[i:i+4000] for i in range(0, len(message), 4000)]
             for chunk in chunks:
@@ -455,3 +693,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+##############################################################################
+##curl  解析返回
+##curl -s na.877774.xyz | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort -u
+##############################################################################
