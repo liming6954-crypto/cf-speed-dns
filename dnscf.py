@@ -2,6 +2,7 @@ import os
 import requests
 import re
 import traceback
+import time  # [FIX] 新增：API 限速保护
 
 # ==================== 环境变量 ====================
 CF_API_TOKEN = os.environ.get("CF_API_TOKEN")       # Cloudflare API Token
@@ -47,11 +48,23 @@ A_RECORDS = [
     ("cmcc.072503.xyz", 1),                         # 移动IP[1]
     ("cmcc.072503.xyz", 2),                         # 移动IP[2]
 
-    # 反代IP
-    ("proxy.072503.xyz", 0),                        # 反代IP[0]
-    ("proxy.072503.xyz", 1),                        # 反代IP[1]
-    ("proxy.072503.xyz", 2),                        # 反代IP[2]
+    ("proxy.072503.xyz", 0),                        # PROXYIPIP[0]
+    ("proxy.072503.xyz", 1),                        # PROXYIPIP[1]
+    ("proxy.072503.xyz", 2),                        # PROXYIPIP[2]
     #################################################################################
+]
+
+# 优选IPv6的AAAA记录，格式：(子域名, IPv6索引)
+AAAA_RECORDS = [
+    ("ct.072503.xyz",  0),                          # 电信IPv6[0]
+    ("ct.072503.xyz",  1),                          # 电信IPv6[1]
+    ("ct.072503.xyz",  2),                          # 电信IPv6[2]
+    ("cu.072503.xyz",  0),                          # 联通IPv6[0]
+    ("cu.072503.xyz",  1),                          # 联通IPv6[1]
+    ("cu.072503.xyz",  2),                          # 联通IPv6[2]
+    ("cmcc.072503.xyz", 0),                         # 移动IPv6[0]
+    ("cmcc.072503.xyz", 1),                         # 移动IPv6[1]
+    ("cmcc.072503.xyz", 2),                         # 移动IPv6[2]
 ]
 
 # 直接CNAME记录（不走SaaS，不需要Custom Hostname，IP自动跟随目标域名）
@@ -96,18 +109,18 @@ CNAME_RECORDS = [
 
     ##############################################################################################
     #不在cloudflare托管的域名 SaaS CNAME + Custom Hostname 证书可能验证会慢一点或验证不了 ############
-    ############################################################################################## 
+    ##############################################################################################
 
 
     ##############################  fishcpy维护 网址:  https://www.byoip.top/######################
     ("cf10", "cloudflare-dl.byoip.top"),      #一级域名
     ##############################################################################################
-    ("cf11", "cloudflare.19931110.xyz"),    #CloudFlare 单IPv4版    #全球加速   高可用    --#泛域名  
+    ("cf11", "cloudflare.19931110.xyz"),    #CloudFlare 单IPv4版    #全球加速   高可用    --#泛域名
     ("cf12", "cf.cnae.top"),                 #CloudFlare 带IPv6版   #全球加速   双栈      --#泛域名
     ("cf13", "edgeone.19931110.xyz"),        #EdgeOne CDN 优选服务   #Tencent 全球优化    --#泛域名
     ("cf14", "netlify.19931110.xyz"),        #Netlify CDN 优选服务  #AWS  全球优化        --#泛域名
-    ("cf15", "vercel.19931110.xyz"),         #Vercel CDN 优选服务     #AWS    全球优化    --#泛域名 
-    
+    ("cf15", "vercel.19931110.xyz"),         #Vercel CDN 优选服务     #AWS    全球优化    --#泛域名
+
 
 
     #############   WeTest.Vip维护   网址: https://www.wetest.vip/######################################
@@ -143,7 +156,7 @@ CNAME_RECORDS = [
     #####################################################################################################################
 ]
 
-# DNS记录总数上限（免费版最多200条，设50留余量）
+# DNS记录总数上限（免费版最多200条，设80留余量）
 MAX_TOTAL_RECORDS = 80
 
 # ==================== API 基础 ====================
@@ -152,7 +165,6 @@ HEADERS = {
     "Authorization": f"Bearer {CF_API_TOKEN}",
     "Content-Type": "application/json"
 }
-
 # ==================== Telegram 通知 ====================
 
 def send_telegram(message):
@@ -171,7 +183,6 @@ def send_telegram(message):
             print(resp.text)
     except Exception:
         traceback.print_exc()
-
 # ==================== 工具函数 ====================
 
 def is_valid_ipv4(ip):
@@ -182,6 +193,14 @@ def is_valid_ipv4(ip):
     except Exception:
         return False
 
+def is_valid_ipv6(ip):
+    """验证是否为合法 IPv6 地址"""  # [FIX] 修正 docstring（原来误写为 IPv4）
+    try:
+        import ipaddress
+        ipaddress.IPv6Address(ip)
+        return True
+    except Exception:
+        return False
 # ==================== 优选 IP 获取 ====================
 
 def get_cf_speed_test_ip():
@@ -222,8 +241,6 @@ def get_isp_ips(isp, count=6):
         traceback.print_exc()
     print(f"获取到 {len(ips)} 个{isp}优选IP")
     return ips
-
-
 def get_bestproxy_ips(count=6):
     """从 ipdb.api.030101.xyz 获取反代IP"""
     url = f"https://ipdb.api.030101.xyz/?type=bestproxy&country=true"
@@ -244,9 +261,23 @@ def get_bestproxy_ips(count=6):
     print(f"获取到 {len(ips)} 个反代IP")
     return ips
 
-
-
-
+def get_isp_ips_v6(isp, count=6):
+    """从 cf.090227.xyz 按运营商获取优选IPv6"""
+    url = f"https://cf.090227.xyz/{isp}?ips={count}&type=cfv6"
+    ips = []
+    try:
+        print(f"获取{isp}优选IPv6: {url}")
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        for line in r.text.strip().splitlines():
+            ip = line.split("#")[0].strip()
+            if is_valid_ipv6(ip) and ip not in ips:
+                ips.append(ip)
+    except Exception:
+        print(f"获取{isp}优选IPv6失败: {url}")
+        traceback.print_exc()
+    print(f"获取到 {len(ips)} 个{isp}优选IPv6")
+    return ips
 # ==================== DNS 记录操作 ====================
 
 def get_existing_records():
@@ -278,13 +309,13 @@ def create_record(record_type, name, content, proxied=False):
         result = resp.json()
         if result.get("success"):
             print(f"创建 {record_type} {name} -> {content} (proxied={proxied})")
+            time.sleep(0.1)  # [FIX] API 限速保护
             return True
         print(result)
         return False
     except Exception:
         traceback.print_exc()
         return False
-
 def update_record(record_id, record_type, name, content, proxied=False):
     """更新 DNS 记录"""
     try:
@@ -294,6 +325,7 @@ def update_record(record_id, record_type, name, content, proxied=False):
         result = resp.json()
         if result.get("success"):
             print(f"更新 {record_type} {name} -> {content} (proxied={proxied})")
+            time.sleep(0.1)  # [FIX] API 限速保护
             return True
         print(result)
         return False
@@ -309,6 +341,7 @@ def delete_record(record_id):
         result = resp.json()
         if result.get("success"):
             print(f"删除记录 {record_id}")
+            time.sleep(0.1)  # [FIX] API 限速保护
             return True
         print(result)
         return False
@@ -348,6 +381,7 @@ def create_custom_hostname(hostname):
         result = resp.json()
         if result.get("success"):
             print(f"创建 Custom Hostname: {hostname}")
+            time.sleep(0.1)  # [FIX] API 限速保护
             return True
         print(f"创建 Custom Hostname 失败: {hostname}")
         print(result)
@@ -355,7 +389,6 @@ def create_custom_hostname(hostname):
     except Exception:
         traceback.print_exc()
         return False
-
 def delete_custom_hostname(ch_id, hostname=""):
     """删除 Custom Hostname"""
     try:
@@ -364,6 +397,7 @@ def delete_custom_hostname(ch_id, hostname=""):
         result = resp.json()
         if result.get("success"):
             print(f"删除 Custom Hostname: {hostname} ({ch_id})")
+            time.sleep(0.1)  # [FIX] API 限速保护
             return True
         print(f"删除 Custom Hostname 失败: {ch_id}")
         print(result)
@@ -383,7 +417,6 @@ def check_and_fix_custom_hostname(hostname, ch_data):
 
     print(f"SSL异常: {hostname} 状态={ssl_status} 方法={ssl_method}")
 
-    # 重新验证 SSL
     if ssl_status in ("pending_validation", "validation_failed", "expired", "inactive"):
         try:
             url = f"{CH_BASE_URL}/{ch_data['id']}"
@@ -401,8 +434,6 @@ def check_and_fix_custom_hostname(hostname, ch_data):
             traceback.print_exc()
             return False
     return False
-
-
 # ==================== 主逻辑 ====================
 
 def main():
@@ -415,16 +446,19 @@ def main():
         return
 
     # 1. 分别获取优选IP
-    ips = get_cf_speed_test_ip()          # ip.164746.xyz 综合优选
-    ct_ips = get_isp_ips("ct", 6)         # 电信优选
-    cu_ips = get_isp_ips("cu", 6)         # 联通优选
-    cmcc_ips = get_isp_ips("cmcc", 6)     # 移动优选
-    proxy_ips = get_bestproxy_ips(6)      # 反代IP
+    ips = get_cf_speed_test_ip()
+    ct_ips = get_isp_ips("ct", 6)
+    cu_ips = get_isp_ips("cu", 6)
+    cmcc_ips = get_isp_ips("cmcc", 6)
+    proxy_ips = get_bestproxy_ips(6)
+    ct_ips_v6 = get_isp_ips_v6("ct", 6)
+    cu_ips_v6 = get_isp_ips_v6("cu", 6)
+    cmcc_ips_v6 = get_isp_ips_v6("cmcc", 6)
 
     if not ips and not ct_ips and not cu_ips and not cmcc_ips and not proxy_ips:
         send_telegram("❌ 未获取到任何优选IP")
         return
-    # 部分API失败时通知
+
     warnings = []
     if not ips:
         warnings.append("ip.164746.xyz 获取失败")
@@ -439,6 +473,27 @@ def main():
     if warnings:
         print(f"警告: {', '.join(warnings)}")
 
+    # [FIX] IPv4 和 IPv6 分别追踪失败的前缀
+    failed_isp_prefixes = set()       # A 记录清理保护
+    failed_isp_prefixes_v6 = set()    # AAAA 记录清理保护
+
+    if not ips:
+        failed_isp_prefixes.add("dns.072503.xyz")       # 综合IP失败保护
+    if not ct_ips:
+        failed_isp_prefixes.add("ct.072503.xyz")
+    if not cu_ips:
+        failed_isp_prefixes.add("cu.072503.xyz")
+    if not cmcc_ips:
+        failed_isp_prefixes.add("cmcc.072503.xyz")
+    if not proxy_ips:
+        failed_isp_prefixes.add("proxy.072503.xyz")
+
+    if not ct_ips_v6:
+        failed_isp_prefixes_v6.add("ct.072503.xyz")
+    if not cu_ips_v6:
+        failed_isp_prefixes_v6.add("cu.072503.xyz")
+    if not cmcc_ips_v6:
+        failed_isp_prefixes_v6.add("cmcc.072503.xyz")
 
     # 2. 获取现有 DNS 记录
     existing = get_existing_records()
@@ -479,7 +534,6 @@ def main():
             ip = ip_list[ip_index % len(ip_list)]
             desired_a.append((domain.lower(), ip))
 
-
     existing_a_set = set(existing_a_map.keys())
     desired_a_set = set(desired_a)
     existing_a_by_name = {}
@@ -499,7 +553,6 @@ def main():
                 tg_results.append(f"跳过A\n{domain_lower}\n{ip}")
             continue
 
-        ##################################添加A记录######################################################
         same_name_records = existing_a_by_name.get(domain_lower, [])
         if same_name_records:
             record_to_update = None
@@ -515,14 +568,12 @@ def main():
                     new_key = (domain_lower, ip)
                     existing_a_set.add(new_key)
                     same_name_records.remove(record_to_update)
-                    ####################### 注意：id="new" 是占位符，仅用于本轮循环的内存状态追踪，不会用于API调用############################
                     new_record = {"id": record_to_update["id"], "type": "A", "name": domain_lower, "content": ip, "proxied": proxied}
                     same_name_records.append(new_record)
                     existing_a_map[new_key] = new_record
                     updated_count += 1
                     tg_results.append(f"更新A\n{domain_lower}\n-> {ip}")
             else:
-                # 已有记录都在期望列表中，需要创建新记录
                 if current_total_records >= MAX_TOTAL_RECORDS:
                     tg_results.append(f"DNS记录达到上限\n{domain_lower}")
                 elif create_record("A", domain_lower, ip, proxied=proxied):
@@ -545,8 +596,113 @@ def main():
                 existing_a_by_name.setdefault(domain_lower, []).append(new_record)
                 existing_a_map[(domain_lower, ip)] = new_record
                 tg_results.append(f"创建A\n{domain_lower}\n-> {ip}")
+    # ==================== 清理多余A记录 ====================
+    print("\n========== 清理多余A记录 ==========\n")
 
-        ##############################################################################################################
+    for (name, ip), r in list(existing_a_map.items()):
+        if name in PROTECTED_NAMES:
+            continue
+        if name in failed_isp_prefixes:  # [FIX] ISP获取失败时跳过清理，避免误删
+            print(f"跳过清理（ISP获取失败）: {name} -> {ip}")
+            continue
+        if (name, ip) not in desired_a_set:
+            print(f"清理多余A记录: {name} -> {ip}")
+            if delete_record(r["id"]):
+                current_total_records -= 1
+                updated_count += 1
+                tg_results.append(f"清理多余A\n{name}\n{ip}")
+
+    # ==================== AAAA 记录处理 ====================
+    print("\n========== AAAA记录 ==========\n")
+
+    desired_aaaa = []
+    for domain, ip_index in AAAA_RECORDS:
+        if domain.startswith("ct."):
+            ip_list = ct_ips_v6
+        elif domain.startswith("cu."):
+            ip_list = cu_ips_v6
+        elif domain.startswith("cmcc."):
+            ip_list = cmcc_ips_v6
+        else:
+            ip_list = []
+        if ip_list:
+            ip = ip_list[ip_index % len(ip_list)]
+            desired_aaaa.append((domain.lower(), ip))
+
+    existing_aaaa_map = {}
+    for r in existing:
+        if r["type"] == "AAAA":
+            existing_aaaa_map[(r["name"].lower(), r["content"])] = r
+
+    existing_aaaa_set = set(existing_aaaa_map.keys())
+    desired_aaaa_set = set(desired_aaaa)
+    existing_aaaa_by_name = {}
+    for (name, ip), r in existing_aaaa_map.items():
+        existing_aaaa_by_name.setdefault(name, []).append(r)
+
+    for domain_lower, ip in desired_aaaa:
+        if (domain_lower, ip) in existing_aaaa_set:
+            print(f"跳过 AAAA {domain_lower} -> {ip}")
+            tg_results.append(f"跳过AAAA\n{domain_lower}\n{ip}")
+            continue
+        same_name_records = existing_aaaa_by_name.get(domain_lower, [])
+        if same_name_records:
+            record_to_update = None
+            for r in same_name_records:
+                if (domain_lower, r["content"]) not in desired_aaaa_set:
+                    record_to_update = r
+                    break
+            if record_to_update:
+                if update_record(record_to_update["id"], "AAAA", domain_lower, ip):
+                    old_key = (domain_lower, record_to_update["content"])
+                    existing_aaaa_map.pop(old_key, None)
+                    existing_aaaa_set.discard(old_key)
+                    new_key = (domain_lower, ip)
+                    existing_aaaa_set.add(new_key)
+                    same_name_records.remove(record_to_update)
+                    new_record = {"id": record_to_update["id"], "type": "AAAA", "name": domain_lower, "content": ip}
+                    same_name_records.append(new_record)
+                    existing_aaaa_map[new_key] = new_record
+                    updated_count += 1
+                    tg_results.append(f"更新AAAA\n{domain_lower}\n-> {ip}")
+            else:
+                if current_total_records >= MAX_TOTAL_RECORDS:
+                    tg_results.append(f"DNS记录达到上限\n{domain_lower}")
+                elif create_record("AAAA", domain_lower, ip):
+                    current_total_records += 1
+                    updated_count += 1
+                    existing_aaaa_set.add((domain_lower, ip))
+                    new_record = {"id": "new", "type": "AAAA", "name": domain_lower, "content": ip}
+                    existing_aaaa_by_name.setdefault(domain_lower, []).append(new_record)
+                    existing_aaaa_map[(domain_lower, ip)] = new_record
+                    tg_results.append(f"创建AAAA\n{domain_lower}\n-> {ip}")
+        else:
+            if current_total_records >= MAX_TOTAL_RECORDS:
+                tg_results.append(f"DNS记录达到上限\n{domain_lower}")
+                continue
+            if create_record("AAAA", domain_lower, ip):
+                current_total_records += 1
+                updated_count += 1
+                existing_aaaa_set.add((domain_lower, ip))
+                new_record = {"id": "new", "type": "AAAA", "name": domain_lower, "content": ip}
+                existing_aaaa_by_name.setdefault(domain_lower, []).append(new_record)
+                existing_aaaa_map[(domain_lower, ip)] = new_record
+                tg_results.append(f"创建AAAA\n{domain_lower}\n-> {ip}")
+
+    # 清理多余AAAA记录
+    for (name, ip), r in list(existing_aaaa_map.items()):
+        if name in PROTECTED_NAMES:
+            continue
+        if name in failed_isp_prefixes_v6:  # [FIX] IPv6 ISP获取失败时跳过清理
+            print(f"跳过清理AAAA（ISP获取失败）: {name} -> {ip}")
+
+            continue
+        if (name, ip) not in desired_aaaa_set:
+            print(f"清理多余AAAA记录: {name} -> {ip}")
+            if delete_record(r["id"]):
+                current_total_records -= 1
+                updated_count += 1
+                tg_results.append(f"清理多余AAAA\n{name}\n{ip}")
 
     # ==================== 直接 CNAME 处理 ====================
     print("\n========== 直接CNAME ==========\n")
@@ -559,7 +715,7 @@ def main():
                 print(f"跳过 CNAME {name_lower} -> {target}")
                 tg_results.append(f"跳过CNAME\n{name_lower}")
             else:
-                if update_record(existing_record["id"], "CNAME", existing_record["name"], target):
+                if update_record(existing_record["id"], "CNAME", name_lower, target):  # [FIX] 统一用 name_lower
                     updated_count += 1
                     tg_results.append(f"更新CNAME\n{name_lower}\n-> {target}")
         else:
@@ -594,7 +750,7 @@ def main():
                 print(f"跳过 CNAME {cname_name} -> {target}")
                 tg_results.append(f"跳过CNAME\n{cname_name}")
             else:
-                if update_record(existing_record["id"], "CNAME", existing_record["name"], target):
+                if update_record(existing_record["id"], "CNAME", cname_name, target):  # [FIX] 统一用 cname_name
                     updated_count += 1
                     tg_results.append(f"更新CNAME\n{cname_name}\n-> {target}")
         else:
@@ -620,16 +776,14 @@ def main():
                 ssl_status = ch_data.get("ssl", {}).get("status", "unknown")
                 tg_results.append(f"重新验证SSL\n{cname_name}\n状态: {ssl_status}")
 
-
-
     # ==================== 清理孤立 Custom Hostname ====================
     print("\n========== 清理孤立 Custom Hostname ==========\n")
 
     for ch_hostname, ch in list(ch_map.items()):
         if ch_hostname in PROTECTED_NAMES:
             continue
-        is_cf_tag = any(ch_hostname == f"{tag}.{DOMAIN_ROOT}".lower() for tag, _ in CNAME_RECORDS)
-        if is_cf_tag and ch_hostname not in desired_cname_names:
+        # [FIX] 修复原来死代码：去掉 is_cf_tag 条件，只检查是否在期望列表中
+        if ch_hostname not in desired_cname_names:
             print(f"清理孤立CH: {ch_hostname}")
             if delete_custom_hostname(ch["id"], ch_hostname):
                 updated_count += 1
@@ -653,10 +807,13 @@ def main():
     print("==============================")
 
     try:
-        # 按类型分类统计
-        created_a = [r for r in tg_results if r.startswith("创建A")]
-        updated_a = [r for r in tg_results if r.startswith("更新A")]
-        skipped_a = [r for r in tg_results if r.startswith("跳过A")]
+        # [FIX] 精确匹配，避免 A 和 AAAA 互相误匹配
+        created_a = [r for r in tg_results if r.startswith("创建A\n") and not r.startswith("创建AAAA")]
+        updated_a = [r for r in tg_results if r.startswith("更新A\n") and not r.startswith("更新AAAA")]
+        skipped_a = [r for r in tg_results if r.startswith("跳过A\n") and not r.startswith("跳过AAAA")]
+        created_aaaa = [r for r in tg_results if r.startswith("创建AAAA")]  # [FIX] 提前定义
+        updated_aaaa = [r for r in tg_results if r.startswith("更新AAAA")]  # [FIX] 提前定义
+        skipped_aaaa = [r for r in tg_results if r.startswith("跳过AAAA")]
         created_cname = [r for r in tg_results if r.startswith("创建CNAME")]
         updated_cname = [r for r in tg_results if r.startswith("更新CNAME")]
         skipped_cname = [r for r in tg_results if r.startswith("跳过CNAME")]
@@ -686,6 +843,13 @@ def main():
                 lines.append(f"  移动: {', '.join(cmcc_ips[:2])}")
             if proxy_ips:
                 lines.append(f"  反代: {', '.join(proxy_ips[:2])}")
+            if ct_ips_v6:
+                lines.append(f"  电信v6: {', '.join(ct_ips_v6[:2])}")
+            if cu_ips_v6:
+                lines.append(f"  联通v6: {', '.join(cu_ips_v6[:2])}")
+            if cmcc_ips_v6:
+                lines.append(f"  移动v6: {', '.join(cmcc_ips_v6[:2])}")
+
             # A记录变更
             if created_a or updated_a:
                 lines.append(f"\n🟢 <b>A记录变更 ({len(created_a) + len(updated_a)})</b>")
@@ -693,6 +857,16 @@ def main():
                     parts = r.split("\n")
                     lines.append(f"  ➕ {' → '.join(parts[1:])}")
                 for r in updated_a:
+                    parts = r.split("\n")
+                    lines.append(f"  ✏️ {' → '.join(parts[1:])}")
+
+            # [FIX] AAAA记录变更（变量已提前定义）
+            if created_aaaa or updated_aaaa:
+                lines.append(f"\n🟣 <b>AAAA记录变更 ({len(created_aaaa) + len(updated_aaaa)})</b>")
+                for r in created_aaaa:
+                    parts = r.split("\n")
+                    lines.append(f"  ➕ {' → '.join(parts[1:])}")
+                for r in updated_aaaa:
                     parts = r.split("\n")
                     lines.append(f"  ✏️ {' → '.join(parts[1:])}")
 
@@ -721,7 +895,6 @@ def main():
                     parts = r.split("\n")
                     lines.append(f"  🔄 {parts[1]} ({parts[2] if len(parts) > 2 else ''})")
 
-
             # 清理
             if cleaned or deleted:
                 lines.append(f"\n🗑️ <b>清理 ({len(cleaned) + len(deleted)})</b>")
@@ -743,7 +916,7 @@ def main():
                     lines.append(f"  ❌ {w}")
 
             # 跳过统计
-            skip_count = len(skipped_a) + len(skipped_cname)
+            skip_count = len(skipped_a) + len(skipped_cname) + len(skipped_aaaa)
             if skip_count > 0:
                 lines.append(f"\n⏭️ <b>跳过:</b> {skip_count}条（无变化）")
 
