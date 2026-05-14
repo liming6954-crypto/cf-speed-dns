@@ -1,3 +1,4 @@
+```python
 import os
 import requests
 import re
@@ -232,6 +233,12 @@ def is_valid_cname_target(target):
     # 基本域名格式校验
     return bool(re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*\.$|^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$', target))
 
+# [NEW] 日志收集函数，打印的同时收集日志用于 Telegram 通知
+def log(msg, logs=None):
+    """打印并收集日志"""
+    print(msg)
+    if logs is not None:
+        logs.append(msg)
 
 
 # ==================== 优选 IP 获取 ====================
@@ -490,6 +497,7 @@ def check_and_fix_custom_hostname(hostname, ch_data):
 
 def main():
     tg_results = []
+    log_messages = []  # [NEW] 操作日志收集
     if not CF_API_TOKEN:
         print("缺少环境变量 CF_API_TOKEN")
         return
@@ -610,8 +618,9 @@ def main():
                 if update_record(existing_r["id"], "A", domain_lower, ip, proxied=proxied):
                     updated_count += 1
                     tg_results.append(f"更新A代理状态\n{domain_lower}\nproxied={proxied}")
+                    log(f"更新A代理状态 {domain_lower} proxied={proxied}", log_messages)
             else:
-                print(f"跳过 A {domain_lower} -> {ip}")
+                log(f"跳过 A {domain_lower} -> {ip}", log_messages)
                 tg_results.append(f"跳过A\n{domain_lower}\n{ip}")
             continue
 
@@ -635,6 +644,7 @@ def main():
                     existing_a_map[new_key] = new_record
                     updated_count += 1
                     tg_results.append(f"更新A\n{domain_lower}\n-> {ip}")
+                    log(f"更新A {domain_lower} -> {ip}", log_messages)
             else:
                 if current_total_records >= MAX_TOTAL_RECORDS:
                     tg_results.append(f"DNS记录达到上限\n{domain_lower}")
@@ -646,6 +656,7 @@ def main():
                     existing_a_by_name.setdefault(domain_lower, []).append(new_record)
                     existing_a_map[(domain_lower, ip)] = new_record
                     tg_results.append(f"创建A\n{domain_lower}\n-> {ip}")
+                    log(f"创建A {domain_lower} -> {ip}", log_messages)
         else:
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{domain_lower}")
@@ -658,6 +669,7 @@ def main():
                 existing_a_by_name.setdefault(domain_lower, []).append(new_record)
                 existing_a_map[(domain_lower, ip)] = new_record
                 tg_results.append(f"创建A\n{domain_lower}\n-> {ip}")
+                log(f"创建A {domain_lower} -> {ip}", log_messages)
     # ==================== 清理多余A记录 ====================
     print("\n========== 清理多余A记录 ==========\n")
 
@@ -665,10 +677,10 @@ def main():
         if name in PROTECTED_NAMES:
             continue
         if name in failed_isp_prefixes:  # [FIX] ISP获取失败时跳过清理，避免误删
-            print(f"跳过清理（ISP获取失败）: {name} -> {ip}")
+            log(f"跳过清理（ISP获取失败）: {name} -> {ip}", log_messages)
             continue
         if (name, ip) not in desired_a_set:
-            print(f"清理多余A记录: {name} -> {ip}")
+            log(f"清理多余A记录: {name} -> {ip}", log_messages)
             if delete_record(r["id"]):
                 current_total_records -= 1
                 updated_count += 1
@@ -704,7 +716,7 @@ def main():
 
     for domain_lower, ip in desired_aaaa:
         if (domain_lower, ip) in existing_aaaa_set:
-            print(f"跳过 AAAA {domain_lower} -> {ip}")
+            log(f"跳过 AAAA {domain_lower} -> {ip}", log_messages)
             tg_results.append(f"跳过AAAA\n{domain_lower}\n{ip}")
             continue
         same_name_records = existing_aaaa_by_name.get(domain_lower, [])
@@ -727,6 +739,7 @@ def main():
                     existing_aaaa_map[new_key] = new_record
                     updated_count += 1
                     tg_results.append(f"更新AAAA\n{domain_lower}\n-> {ip}")
+                    log(f"更新AAAA {domain_lower} -> {ip}", log_messages)
             else:
                 if current_total_records >= MAX_TOTAL_RECORDS:
                     tg_results.append(f"DNS记录达到上限\n{domain_lower}")
@@ -738,6 +751,7 @@ def main():
                     existing_aaaa_by_name.setdefault(domain_lower, []).append(new_record)
                     existing_aaaa_map[(domain_lower, ip)] = new_record
                     tg_results.append(f"创建AAAA\n{domain_lower}\n-> {ip}")
+                    log(f"创建AAAA {domain_lower} -> {ip}", log_messages)
         else:
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{domain_lower}")
@@ -750,17 +764,17 @@ def main():
                 existing_aaaa_by_name.setdefault(domain_lower, []).append(new_record)
                 existing_aaaa_map[(domain_lower, ip)] = new_record
                 tg_results.append(f"创建AAAA\n{domain_lower}\n-> {ip}")
+                log(f"创建AAAA {domain_lower} -> {ip}", log_messages)
 
     # 清理多余AAAA记录
     for (name, ip), r in list(existing_aaaa_map.items()):
         if name in PROTECTED_NAMES:
             continue
         if name in failed_isp_prefixes_v6:  # [FIX] IPv6 ISP获取失败时跳过清理
-            print(f"跳过清理AAAA（ISP获取失败）: {name} -> {ip}")
-
+            log(f"跳过清理AAAA（ISP获取失败）: {name} -> {ip}", log_messages)
             continue
         if (name, ip) not in desired_aaaa_set:
-            print(f"清理多余AAAA记录: {name} -> {ip}")
+            log(f"清理多余AAAA记录: {name} -> {ip}", log_messages)
             if delete_record(r["id"]):
                 current_total_records -= 1
                 updated_count += 1
@@ -770,10 +784,6 @@ def main():
     
     # ==================== 直接 CNAME 处理 ====================
 
-
-
-
-
     print("\n========== 直接CNAME ==========\n")
 
     for name, target in DIRECT_CNAME_RECORDS:
@@ -781,21 +791,23 @@ def main():
         existing_record = existing_cname_map.get(name_lower)
         if existing_record:
             if existing_record["content"].lower() == target.lower():
-                print(f"跳过 CNAME {name_lower} -> {target}")
+                log(f"跳过 CNAME {name_lower} -> {target}", log_messages)
                 tg_results.append(f"跳过CNAME\n{name_lower}")
             else:
                 if update_record(existing_record["id"], "CNAME", name_lower, target):  # [FIX] 统一用 name_lower
                     updated_count += 1
                     tg_results.append(f"更新CNAME\n{name_lower}\n-> {target}")
+                    log(f"更新CNAME {name_lower} -> {target}", log_messages)
         else:
             same_name_a = existing_a_by_name.get(name_lower, [])
             if same_name_a:
-                for r in same_name_a:
-                    if delete_record(r["id"]):
+              for r in same_name_a:
+                  if delete_record(r["id"]):
                         existing_a_map.pop((name_lower, r["content"]), None)
                         current_total_records -= 1
                         updated_count += 1
                         tg_results.append(f"删除A记录\n{name_lower}\n{r['content']}")
+                        log(f"删除A记录 {name_lower} {r['content']}", log_messages)
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{name_lower}")
                 continue
@@ -804,6 +816,7 @@ def main():
                 updated_count += 1
                 existing_cname_map[name_lower] = {"id": "new", "type": "CNAME", "name": name_lower, "content": target}
                 tg_results.append(f"创建CNAME\n{name_lower}\n-> {target}")
+                log(f"创建CNAME {name_lower} -> {target}", log_messages)
 
     # ==================== SaaS CNAME + Custom Hostname 处理 ====================
     print("\n========== SaaS CNAME + Custom Hostname ==========\n")
@@ -812,20 +825,21 @@ def main():
 
     for cf_tag, target in CNAME_RECORDS:
         cname_name = f"{cf_tag}.{DOMAIN_ROOT}".lower()
-        if not is_valid_cname_target(target):          # ← 加这3行
-            print(f"跳过无效CNAME目标: {target}")
+        if not is_valid_cname_target(target):
+            log(f"跳过无效CNAME目标: {target}", log_messages)
             tg_results.append(f"无效CNAME目标\n{cname_name}\n{target}")
             continue
         desired_cname_names.add(cname_name)
         existing_record = existing_cname_map.get(cname_name)
         if existing_record:
             if existing_record["content"].lower() == target.lower():
-                print(f"跳过 CNAME {cname_name} -> {target}")
+                log(f"跳过 CNAME {cname_name} -> {target}", log_messages)
                 tg_results.append(f"跳过CNAME\n{cname_name}")
             else:
                 if update_record(existing_record["id"], "CNAME", cname_name, target):  # [FIX] 统一用 cname_name
                     updated_count += 1
                     tg_results.append(f"更新CNAME\n{cname_name}\n-> {target}")
+                    log(f"更新CNAME {cname_name} -> {target}", log_messages)
         else:
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{cname_name}")
@@ -835,14 +849,17 @@ def main():
                 updated_count += 1
                 existing_cname_map[cname_name] = {"id": "new", "type": "CNAME", "name": cname_name, "content": target}
                 tg_results.append(f"创建CNAME\n{cname_name}\n-> {target}")
+                log(f"创建CNAME {cname_name} -> {target}", log_messages)
 
         # 确保 Custom Hostname 存在
         if cname_name not in ch_map:
             if create_custom_hostname(cname_name):
                 updated_count += 1
                 tg_results.append(f"创建CH成功\n{cname_name}")
+                log(f"创建CH成功 {cname_name}", log_messages)
             else:
                 tg_results.append(f"创建CH失败\n{cname_name}")
+                log(f"创建CH失败 {cname_name}", log_messages)
         else:
             # 检查已有 Custom Hostname 的 SSL 状态
             ch_data = ch_map[cname_name]
@@ -850,6 +867,7 @@ def main():
                 updated_count += 1
                 ssl_status = ch_data.get("ssl", {}).get("status", "unknown")
                 tg_results.append(f"重新验证SSL\n{cname_name}\n状态: {ssl_status}")
+                log(f"重新验证SSL {cname_name} 状态: {ssl_status}", log_messages)
 
     # ==================== 清理孤立 Custom Hostname ====================
     print("\n========== 清理孤立 Custom Hostname ==========\n")
@@ -859,7 +877,7 @@ def main():
             continue
         # [FIX] 修复原来死代码：去掉 is_cf_tag 条件，只检查是否在期望列表中
         if ch_hostname not in desired_cname_names:
-            print(f"清理孤立CH: {ch_hostname}")
+            log(f"清理孤立CH: {ch_hostname}", log_messages)
             if delete_custom_hostname(ch["id"], ch_hostname):
                 updated_count += 1
                 tg_results.append(f"清理孤立CH\n{ch_hostname}")
@@ -880,7 +898,7 @@ def main():
         if name_lower not in desired_all_cnames:
             if re.match(r'^\d+-\d+-\d+-\d+\.', name_lower):
                 continue
-            print(f"清理多余CNAME: {name_lower}")
+            log(f"清理多余CNAME: {name_lower}", log_messages)
             if delete_record(r["id"]):
                 current_total_records -= 1
                 updated_count += 1
@@ -893,7 +911,7 @@ def main():
     for name_lower, r in list(existing_cname_map.items()):
         old_pattern = re.compile(r'^\d+-\d+-\d+-\d+\.')
         if old_pattern.match(name_lower) and name_lower not in PROTECTED_NAMES:
-            print(f"清理旧IP-tag CNAME: {name_lower}")
+            log(f"清理旧IP-tag CNAME: {name_lower}", log_messages)
             if delete_record(r["id"]):
                 updated_count += 1
                 tg_results.append(f"清理旧CNAME\n{name_lower}")
@@ -1018,6 +1036,13 @@ def main():
             if skip_count > 0:
                 lines.append(f"\n⏭️ <b>跳过:</b> {skip_count}条（无变化）")
 
+            # [NEW] 操作日志附加
+            if log_messages:
+                lines.append(f"\n📋 <b>操作日志 ({len(log_messages)}条):</b>")
+                for msg in log_messages:
+                    display = msg[:80] + "..." if len(msg) > 80 else msg
+                    lines.append(f"  · {display}")
+
             message = "\n".join(lines)
 
         if len(message) > 4000:
@@ -1039,4 +1064,3 @@ if __name__ == "__main__":
 ##curl  解析返回
 ##curl -s na.877774.xyz | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort -u
 ##############################################################################
-
