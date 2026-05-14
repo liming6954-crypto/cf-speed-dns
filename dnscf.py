@@ -32,7 +32,7 @@ A_RECORDS = [
     ("dns.072503.xyz",  1),                         # 优选IP入口2（IP[1]）
     ("custom-hostname-fallback.072503.xyz", 0),     # SaaS fallback辅助（IP[0]）
 
-     # ipTop10.html 后8个IP（前2个与上面重复，跳过）
+    # ipTop10.html 后8个IP（前2个与上面重复，跳过）
     ("dns.072503.xyz",  2),
     ("dns.072503.xyz",  3),
     ("dns.072503.xyz",  4),
@@ -62,6 +62,9 @@ A_RECORDS = [
     ("proxy.072503.xyz", 1),                        # PROXYIPIP[1]
     ("proxy.072503.xyz", 2),                        # PROXYIPIP[2]
     #################################################################################
+
+
+
 ]
 
 # 优选IPv6的AAAA记录，格式：(子域名, IPv6索引)
@@ -87,6 +90,7 @@ DIRECT_CNAME_RECORDS = [
 # 格式：(标签, 优选域名)，生成记录名如：cf1.072503.xyz → www.visa.cn
 CNAME_RECORDS = [
     ("cf1", "www.visa.cn"),       # 优选域名1
+
 
     ####育碧(Ubisoft)官方商店域名，使用 CloudFlare CDN 服务。作为全球知名游戏厂商的商店域名，线路质量可靠，稳定性好。#########
     ("cf2", "store.ubi.com"),     # 优选域名2
@@ -164,18 +168,15 @@ CNAME_RECORDS = [
     ############################################    icook.tw#官方优选   ##################################################
     ("cf23", "icook.tw"),
     #####################################################################################################################
-    
-    #####################################################################################################################
+
     ("cf24", "cf.cf.3666888.xyz"),
-    #####################################################################################################################
 
     ####################################ipTop10  一次返回10个US#########################################
-    ("cf25", "ip.164746.xyz/ipTop10.html"),
-    
+ 
 ]
 
 # DNS记录总数上限（免费版最多200条，设80留余量）
-MAX_TOTAL_RECORDS = 80
+MAX_TOTAL_RECORDS = 100
 
 # ==================== API 基础 ====================
 BASE_URL = f"https://api.cloudflare.com/client/v4/zones/{CF_ZONE_ID}/dns_records"
@@ -219,6 +220,20 @@ def is_valid_ipv6(ip):
         return True
     except Exception:
         return False
+
+def api_throttle():
+    """API 限速保护"""
+    time.sleep(0.15)
+
+def is_valid_cname_target(target):
+    """验证 CNAME 目标是否为合法域名（不含路径）"""
+    if "/" in target:
+        return False
+    # 基本域名格式校验
+    return bool(re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*\.$|^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$', target))
+
+
+
 # ==================== 优选 IP 获取 ====================
 
 def get_cf_speed_test_ip():
@@ -265,7 +280,12 @@ def get_isp_ips(isp, count=6):
     return ips
 def get_bestproxy_ips(count=6):
     """从 ipdb.api.030101.xyz 获取反代IP"""
+    #获取优选反代 IP 地址列表并查看 IP 地区
     url = f"https://ipdb.api.030101.xyz/?type=bestproxy&country=true"
+
+    #获取 Cloudflare IPv4 地址列表和反代 IP 地址列表
+    #url = f"https://ipdb.api.030101.xyz/?type=cfv4;proxy"
+
     ips = []
     try:
         print(f"获取反代IP: {url}")
@@ -313,7 +333,7 @@ def get_existing_records():
             data = resp.json()
             if not data.get("success"):
                 print("Cloudflare API失败")
-                return all_records
+                return None
             all_records.extend(data.get("result", []))
             if page >= data.get("result_info", {}).get("total_pages", 1):
                 break
@@ -321,6 +341,7 @@ def get_existing_records():
     except Exception:
         print("获取DNS记录失败")
         traceback.print_exc()
+        return None  # ← 加上
     return all_records
 
 def create_record(record_type, name, content, proxied=False):
@@ -331,7 +352,9 @@ def create_record(record_type, name, content, proxied=False):
         result = resp.json()
         if result.get("success"):
             print(f"创建 {record_type} {name} -> {content} (proxied={proxied})")
-            time.sleep(0.1)  # [FIX] API 限速保护
+            #time.sleep(0.1)  # [FIX] API 限速保护
+            api_throttle()
+
             return True
         print(result)
         return False
@@ -347,7 +370,9 @@ def update_record(record_id, record_type, name, content, proxied=False):
         result = resp.json()
         if result.get("success"):
             print(f"更新 {record_type} {name} -> {content} (proxied={proxied})")
-            time.sleep(0.1)  # [FIX] API 限速保护
+            #time.sleep(0.1)  # [FIX] API 限速保护
+            api_throttle()
+
             return True
         print(result)
         return False
@@ -363,7 +388,8 @@ def delete_record(record_id):
         result = resp.json()
         if result.get("success"):
             print(f"删除记录 {record_id}")
-            time.sleep(0.1)  # [FIX] API 限速保护
+            #time.sleep(0.1)  # [FIX] API 限速保护
+            api_throttle()
             return True
         print(result)
         return False
@@ -385,7 +411,7 @@ def get_custom_hostnames():
             data = resp.json()
             if not data.get("success"):
                 print("获取Custom Hostname失败")
-                return all_ch
+                return None
             all_ch.extend(data.get("result", []))
             if page >= data.get("result_info", {}).get("total_pages", 1):
                 break
@@ -393,6 +419,7 @@ def get_custom_hostnames():
     except Exception:
         print("获取Custom Hostname异常")
         traceback.print_exc()
+        return None  # ← 加上
     return all_ch
 
 def create_custom_hostname(hostname):
@@ -403,7 +430,9 @@ def create_custom_hostname(hostname):
         result = resp.json()
         if result.get("success"):
             print(f"创建 Custom Hostname: {hostname}")
-            time.sleep(0.1)  # [FIX] API 限速保护
+            #time.sleep(0.1)  # [FIX] API 限速保护
+            api_throttle()
+
             return True
         print(f"创建 Custom Hostname 失败: {hostname}")
         print(result)
@@ -419,7 +448,8 @@ def delete_custom_hostname(ch_id, hostname=""):
         result = resp.json()
         if result.get("success"):
             print(f"删除 Custom Hostname: {hostname} ({ch_id})")
-            time.sleep(0.1)  # [FIX] API 限速保护
+            #time.sleep(0.1)  # [FIX] API 限速保护
+            api_throttle()
             return True
         print(f"删除 Custom Hostname 失败: {ch_id}")
         print(result)
@@ -519,6 +549,11 @@ def main():
 
     # 2. 获取现有 DNS 记录
     existing = get_existing_records()
+
+    if existing is None:
+        send_telegram("❌ 获取DNS记录失败，脚本中止")
+        return
+
     existing_a_map = {}
     for r in existing:
         if r["type"] == "A":
@@ -528,14 +563,19 @@ def main():
         if r["type"] == "CNAME":
             existing_cname_map[r["name"].lower()] = r
 
+
     # 3. 获取现有 Custom Hostname
     ch_list = get_custom_hostnames()
+    if ch_list is None:
+        send_telegram("❌ 获取Custom Hostname失败，脚本中止")
+        return
     ch_map = {}
     for ch in ch_list:
         ch_map[ch["hostname"].lower()] = ch
 
-    updated_count = 0
-    current_total_records = len(existing)
+        
+    updated_count = 0                    # 
+    current_total_records = len(existing) # 
 
     # ==================== A 记录处理 ====================
     print("\n========== A记录 ==========\n")
@@ -726,7 +766,14 @@ def main():
                 updated_count += 1
                 tg_results.append(f"清理多余AAAA\n{name}\n{ip}")
 
+
+    
     # ==================== 直接 CNAME 处理 ====================
+
+
+
+
+
     print("\n========== 直接CNAME ==========\n")
 
     for name, target in DIRECT_CNAME_RECORDS:
@@ -765,6 +812,10 @@ def main():
 
     for cf_tag, target in CNAME_RECORDS:
         cname_name = f"{cf_tag}.{DOMAIN_ROOT}".lower()
+        if not is_valid_cname_target(target):          # ← 加这3行
+            print(f"跳过无效CNAME目标: {target}")
+            tg_results.append(f"无效CNAME目标\n{cname_name}\n{target}")
+            continue
         desired_cname_names.add(cname_name)
         existing_record = existing_cname_map.get(cname_name)
         if existing_record:
@@ -789,7 +840,9 @@ def main():
         if cname_name not in ch_map:
             if create_custom_hostname(cname_name):
                 updated_count += 1
-                tg_results.append(f"创建CH\n{cname_name}")
+                tg_results.append(f"创建CH成功\n{cname_name}")
+            else:
+                tg_results.append(f"创建CH失败\n{cname_name}")
         else:
             # 检查已有 Custom Hostname 的 SSL 状态
             ch_data = ch_map[cname_name]
@@ -810,6 +863,29 @@ def main():
             if delete_custom_hostname(ch["id"], ch_hostname):
                 updated_count += 1
                 tg_results.append(f"清理孤立CH\n{ch_hostname}")
+
+
+    # ==================== 清理多余 CNAME 记录 ====================
+    print("\n========== 清理多余CNAME ==========\n")
+
+    desired_all_cnames = set()
+    for name, _ in DIRECT_CNAME_RECORDS:
+        desired_all_cnames.add(name.lower())
+    for cf_tag, _ in CNAME_RECORDS:
+        desired_all_cnames.add(f"{cf_tag}.{DOMAIN_ROOT}".lower())
+
+    for name_lower, r in list(existing_cname_map.items()):
+        if name_lower in PROTECTED_NAMES:
+            continue
+        if name_lower not in desired_all_cnames:
+            if re.match(r'^\d+-\d+-\d+-\d+\.', name_lower):
+                continue
+            print(f"清理多余CNAME: {name_lower}")
+            if delete_record(r["id"]):
+                current_total_records -= 1
+                updated_count += 1
+                tg_results.append(f"清理多余CNAME\n{name_lower}")
+
 
     # ==================== 清理旧IP-tag CNAME（迁移用） ====================
     print("\n========== 清理旧IP-tag CNAME ==========\n")
@@ -954,6 +1030,7 @@ def main():
         traceback.print_exc()
 
 
+
 if __name__ == "__main__":
     main()
 
@@ -962,3 +1039,4 @@ if __name__ == "__main__":
 ##curl  解析返回
 ##curl -s na.877774.xyz | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort -u
 ##############################################################################
+
