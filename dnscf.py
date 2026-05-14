@@ -1,3 +1,4 @@
+```python
 import os
 import requests
 import re
@@ -291,7 +292,6 @@ def get_bestproxy_ips(count=6):
 
     #获取 Cloudflare IPv4 地址列表和反代 IP 地址列表
     #url = f"https://ipdb.api.030101.xyz/?type=cfv4;proxy"
-
     ips = []
     try:
         print(f"获取反代IP: {url}")
@@ -350,10 +350,13 @@ def get_existing_records():
         return None  # ← 加上
     return all_records
 
-def create_record(record_type, name, content, proxied=False):
+def create_record(record_type, name, content, proxied=False, comment=""):
     """创建 DNS 记录"""
     try:
         data = {"type": record_type, "name": name, "content": content, "ttl": 60, "proxied": proxied}
+        #####注释记录#######
+        if comment:
+            data["comment"] = comment
         resp = requests.post(BASE_URL, headers=HEADERS, json=data, timeout=15)
         result = resp.json()
         if result.get("success"):
@@ -367,11 +370,14 @@ def create_record(record_type, name, content, proxied=False):
     except Exception:
         traceback.print_exc()
         return False
-def update_record(record_id, record_type, name, content, proxied=False):
+def update_record(record_id, record_type, name, content, proxied=False, comment=""):
     """更新 DNS 记录"""
     try:
         url = f"{BASE_URL}/{record_id}"
         data = {"type": record_type, "name": name, "content": content, "ttl": 60, "proxied": proxied}
+        #####注释记录#######
+        if comment:
+            data["comment"] = comment
         resp = requests.put(url, headers=HEADERS, json=data, timeout=15)
         result = resp.json()
         if result.get("success"):
@@ -493,6 +499,29 @@ def check_and_fix_custom_hostname(hostname, ch_data):
             return False
     return False
 # ==================== 主逻辑 ====================
+def get_record_comment(name):
+    """根据域名自动生成 DNS 记录注释"""
+    name = name.lower()
+    if name.startswith("ct."):
+        return "电信优选IP (cf.090227.xyz)"
+    elif name.startswith("cu."):
+        return "联通优选IP (cf.090227.xyz)"
+    elif name.startswith("cmcc."):
+        return "移动优选IP (cf.090227.xyz)"
+    elif name.startswith("proxy."):
+        return "反代IP (ipdb.api.030101.xyz)"
+    elif name.startswith("dns."):
+        return "综合优选IP (ip.164746.xyz)"
+    elif "custom-hostname-fallback" in name:
+        return "SaaS fallback辅助 (ip.164746.xyz)"
+    elif name.startswith("dns1."):
+        return "备用解析 CNAME (saas.sin.fan)"
+    elif name.startswith("dns2."):
+        return "备用解析 CNAME (saas.sin.fan)"
+    elif name.startswith("cf"):
+        return "SaaS CNAME 优选"
+    else:
+        return ""
 
 def main():
     tg_results = []
@@ -614,7 +643,7 @@ def main():
         if (domain_lower, ip) in existing_a_set:
             existing_r = existing_a_map[(domain_lower, ip)]
             if existing_r.get("proxied") != proxied:
-                if update_record(existing_r["id"], "A", domain_lower, ip, proxied=proxied):
+                if update_record(existing_r["id"], "A", domain_lower, ip, proxied=proxied, comment=get_record_comment(domain_lower)):
                     updated_count += 1
                     tg_results.append(f"更新A代理状态\n{domain_lower}\nproxied={proxied}")
                     log(f"更新A代理状态 {domain_lower} proxied={proxied}", log_messages)
@@ -631,7 +660,7 @@ def main():
                     record_to_update = r
                     break
             if record_to_update:
-                if update_record(record_to_update["id"], "A", domain_lower, ip, proxied=proxied):
+                if update_record(record_to_update["id"], "A", domain_lower, ip, proxied=proxied, comment=get_record_comment(domain_lower)):
                     old_key = (domain_lower, record_to_update["content"])
                     existing_a_map.pop(old_key, None)
                     existing_a_set.discard(old_key)
@@ -647,7 +676,7 @@ def main():
             else:
                 if current_total_records >= MAX_TOTAL_RECORDS:
                     tg_results.append(f"DNS记录达到上限\n{domain_lower}")
-                elif create_record("A", domain_lower, ip, proxied=proxied):
+                elif create_record("A", domain_lower, ip, proxied=proxied, comment=get_record_comment(domain_lower)):
                     current_total_records += 1
                     updated_count += 1
                     existing_a_set.add((domain_lower, ip))
@@ -660,7 +689,7 @@ def main():
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{domain_lower}")
                 continue
-            if create_record("A", domain_lower, ip, proxied=proxied):
+            if create_record("A", domain_lower, ip, proxied=proxied, comment=get_record_comment(domain_lower)):
                 current_total_records += 1
                 updated_count += 1
                 existing_a_set.add((domain_lower, ip))
@@ -726,7 +755,7 @@ def main():
                     record_to_update = r
                     break
             if record_to_update:
-                if update_record(record_to_update["id"], "AAAA", domain_lower, ip):
+                if update_record(record_to_update["id"], "AAAA", domain_lower, ip, comment=get_record_comment(domain_lower)):
                     old_key = (domain_lower, record_to_update["content"])
                     existing_aaaa_map.pop(old_key, None)
                     existing_aaaa_set.discard(old_key)
@@ -742,7 +771,7 @@ def main():
             else:
                 if current_total_records >= MAX_TOTAL_RECORDS:
                     tg_results.append(f"DNS记录达到上限\n{domain_lower}")
-                elif create_record("AAAA", domain_lower, ip):
+                elif create_record("AAAA", domain_lower, ip, comment=get_record_comment(domain_lower)):
                     current_total_records += 1
                     updated_count += 1
                     existing_aaaa_set.add((domain_lower, ip))
@@ -755,7 +784,7 @@ def main():
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{domain_lower}")
                 continue
-            if create_record("AAAA", domain_lower, ip):
+            if create_record("AAAA", domain_lower, ip, comment=get_record_comment(domain_lower)):
                 current_total_records += 1
                 updated_count += 1
                 existing_aaaa_set.add((domain_lower, ip))
@@ -793,7 +822,7 @@ def main():
                 log(f"跳过 CNAME {name_lower} -> {target}", log_messages)
                 tg_results.append(f"跳过CNAME\n{name_lower}")
             else:
-                if update_record(existing_record["id"], "CNAME", name_lower, target):  # [FIX] 统一用 name_lower
+                if update_record(existing_record["id"], "CNAME", name_lower, target, comment=get_record_comment(name_lower)):  # [FIX] 统一用 name_lower
                     updated_count += 1
                     tg_results.append(f"更新CNAME\n{name_lower}\n-> {target}")
                     log(f"更新CNAME {name_lower} -> {target}", log_messages)
@@ -810,7 +839,7 @@ def main():
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{name_lower}")
                 continue
-            if create_record("CNAME", name_lower, target):
+            if create_record("CNAME", name_lower, target, comment=get_record_comment(name_lower)):
                 current_total_records += 1
                 updated_count += 1
                 existing_cname_map[name_lower] = {"id": "new", "type": "CNAME", "name": name_lower, "content": target}
@@ -835,7 +864,7 @@ def main():
                 log(f"跳过 CNAME {cname_name} -> {target}", log_messages)
                 tg_results.append(f"跳过CNAME\n{cname_name}")
             else:
-                if update_record(existing_record["id"], "CNAME", cname_name, target):  # [FIX] 统一用 cname_name
+                if update_record(existing_record["id"], "CNAME", cname_name, target, comment=get_record_comment(cname_name)):  # [FIX] 统一用 cname_name
                     updated_count += 1
                     tg_results.append(f"更新CNAME\n{cname_name}\n-> {target}")
                     log(f"更新CNAME {cname_name} -> {target}", log_messages)
@@ -843,7 +872,7 @@ def main():
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{cname_name}")
                 continue
-            if create_record("CNAME", cname_name, target):
+            if create_record("CNAME", cname_name, target, comment=get_record_comment(cname_name)):
                 current_total_records += 1
                 updated_count += 1
                 existing_cname_map[cname_name] = {"id": "new", "type": "CNAME", "name": cname_name, "content": target}
