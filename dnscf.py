@@ -160,16 +160,16 @@ CNAME_RECORDS = [
     #####################################################################################################################
 
     ####################################ipTop10  一次返回10个US#########################################
-    #("cf25", "ip.164746.xyz/ipTop10.html")
-    #("cf26", "ip.164746.xyz/ipTop10.html")
-    ("cf27", "ip.164746.xyz/ipTop10.html")
-    ("cf28", "ip.164746.xyz/ipTop10.html")
-    ("cf29", "ip.164746.xyz/ipTop10.html")
-    ("cf30", "ip.164746.xyz/ipTop10.html")
-    ("cf31", "ip.164746.xyz/ipTop10.html")
-    ("cf32", "ip.164746.xyz/ipTop10.html")
-    ("cf33", "ip.164746.xyz/ipTop10.html")
-    ("cf34", "ip.164746.xyz/ipTop10.html")
+    #("cf25", "ip.164746.xyz/ipTop10.html"),
+    #("cf26", "ip.164746.xyz/ipTop10.html"),
+    ("cf27", "ip.164746.xyz/ipTop10.html"),
+    ("cf28", "ip.164746.xyz/ipTop10.html"),
+    ("cf29", "ip.164746.xyz/ipTop10.html"),
+    ("cf30", "ip.164746.xyz/ipTop10.html"),
+    ("cf31", "ip.164746.xyz/ipTop10.html"),
+    ("cf32", "ip.164746.xyz/ipTop10.html"),
+    ("cf33", "ip.164746.xyz/ipTop10.html"),
+    ("cf34", "ip.164746.xyz/ipTop10.html"),
 ]
 
 # DNS记录总数上限（免费版最多200条，设80留余量）
