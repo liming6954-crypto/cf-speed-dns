@@ -32,6 +32,16 @@ A_RECORDS = [
     ("dns.072503.xyz",  1),                         # 优选IP入口2（IP[1]）
     ("custom-hostname-fallback.072503.xyz", 0),     # SaaS fallback辅助（IP[0]）
 
+     # ipTop10.html 后8个IP（前2个与上面重复，跳过）
+    ("dns.072503.xyz",  2),
+    ("dns.072503.xyz",  3),
+    ("dns.072503.xyz",  4),
+    ("dns.072503.xyz",  5),
+    ("dns.072503.xyz",  6),
+    ("dns.072503.xyz",  7),
+    ("dns.072503.xyz",  8),
+    ("dns.072503.xyz",  9),
+
     ####################################反代 ip##################################
     # 电信优选IP
     ("ct.072503.xyz",  0),                          # 电信IP[0]
@@ -160,16 +170,8 @@ CNAME_RECORDS = [
     #####################################################################################################################
 
     ####################################ipTop10  一次返回10个US#########################################
-    #("cf25", "ip.164746.xyz/ipTop10.html"),
-    #("cf26", "ip.164746.xyz/ipTop10.html"),
-    ("cf27", "ip.164746.xyz/ipTop10.html"),
-    ("cf28", "ip.164746.xyz/ipTop10.html"),
-    ("cf29", "ip.164746.xyz/ipTop10.html"),
-    ("cf30", "ip.164746.xyz/ipTop10.html"),
-    ("cf31", "ip.164746.xyz/ipTop10.html"),
-    ("cf32", "ip.164746.xyz/ipTop10.html"),
-    ("cf33", "ip.164746.xyz/ipTop10.html"),
-    ("cf34", "ip.164746.xyz/ipTop10.html"),
+    ("cf25", "ip.164746.xyz/ipTop10.html"),
+    
 ]
 
 # DNS记录总数上限（免费版最多200条，设80留余量）
@@ -221,7 +223,11 @@ def is_valid_ipv6(ip):
 
 def get_cf_speed_test_ip():
     """从 ipTop.html 获取优选IP列表"""
-    urls = ["https://ip.164746.xyz/ipTop.html"]
+    #一次只返回2个
+    #urls = ["https://ip.164746.xyz/ipTop.html"]
+
+    #一次返回10个
+    urls = ["https://ip.164746.xyz/ipTop10.html"]
     all_ips = []
     for url in urls:
         try:
