@@ -498,6 +498,8 @@ def main():
                 print(f"跳过 A {domain_lower} -> {ip}")
                 tg_results.append(f"跳过A\n{domain_lower}\n{ip}")
             continue
+
+        ##################################添加A记录######################################################
         same_name_records = existing_a_by_name.get(domain_lower, [])
         if same_name_records:
             record_to_update = None
@@ -513,11 +515,24 @@ def main():
                     new_key = (domain_lower, ip)
                     existing_a_set.add(new_key)
                     same_name_records.remove(record_to_update)
+                    ####################### 注意：id="new" 是占位符，仅用于本轮循环的内存状态追踪，不会用于API调用############################
                     new_record = {"id": record_to_update["id"], "type": "A", "name": domain_lower, "content": ip, "proxied": proxied}
                     same_name_records.append(new_record)
                     existing_a_map[new_key] = new_record
                     updated_count += 1
                     tg_results.append(f"更新A\n{domain_lower}\n-> {ip}")
+            else:
+                # 已有记录都在期望列表中，需要创建新记录
+                if current_total_records >= MAX_TOTAL_RECORDS:
+                    tg_results.append(f"DNS记录达到上限\n{domain_lower}")
+                elif create_record("A", domain_lower, ip, proxied=proxied):
+                    current_total_records += 1
+                    updated_count += 1
+                    existing_a_set.add((domain_lower, ip))
+                    new_record = {"id": "new", "type": "A", "name": domain_lower, "content": ip, "proxied": proxied}
+                    existing_a_by_name.setdefault(domain_lower, []).append(new_record)
+                    existing_a_map[(domain_lower, ip)] = new_record
+                    tg_results.append(f"创建A\n{domain_lower}\n-> {ip}")
         else:
             if current_total_records >= MAX_TOTAL_RECORDS:
                 tg_results.append(f"DNS记录达到上限\n{domain_lower}")
@@ -526,13 +541,12 @@ def main():
                 current_total_records += 1
                 updated_count += 1
                 existing_a_set.add((domain_lower, ip))
-
-                # 注意：id="new" 是占位符，仅用于本轮循环的内存状态追踪，不会用于API调用
                 new_record = {"id": "new", "type": "A", "name": domain_lower, "content": ip, "proxied": proxied}
-
                 existing_a_by_name.setdefault(domain_lower, []).append(new_record)
                 existing_a_map[(domain_lower, ip)] = new_record
                 tg_results.append(f"创建A\n{domain_lower}\n-> {ip}")
+
+        ##############################################################################################################
 
     # ==================== 直接 CNAME 处理 ====================
     print("\n========== 直接CNAME ==========\n")
