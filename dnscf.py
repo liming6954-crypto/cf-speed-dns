@@ -54,17 +54,17 @@ A_RECORDS = [
     #################################################################################
 
     
-    #################################### US #########################################
-    ("https://ip.164746.xyz/ipTop10.html",2),
-    ("https://ip.164746.xyz/ipTop10.html"3),
-    ("https://ip.164746.xyz/ipTop10.html",4),
-    ("https://ip.164746.xyz/ipTop10.html",5),
-    ("https://ip.164746.xyz/ipTop10.html",6),
-    ("https://ip.164746.xyz/ipTop10.html",7),
-    ("https://ip.164746.xyz/ipTop10.html",8),
-    ("https://ip.164746.xyz/ipTop10.html",9),
-    ("https://ip.164746.xyz/ipTop10.html",10),
-    ("https://ip.164746.xyz/ipTop10.html",11),
+    #################################### US 一次返回10条记录#########################################
+    ("ip.164746.xyz/ipTop10.html",2),
+    ("ip.164746.xyz/ipTop10.html"3),
+    ("ip.164746.xyz/ipTop10.html",4),
+    ("ip.164746.xyz/ipTop10.html",5),
+    ("ip.164746.xyz/ipTop10.html",6),
+    ("ip.164746.xyz/ipTop10.html",7),
+    ("ip.164746.xyz/ipTop10.html",8),
+    ("ip.164746.xyz/ipTop10.html",9),
+    ("ip.164746.xyz/ipTop10.html",10),
+    ("ip.164746.xyz/ipTop10.html",11),
 ]
 
 # 优选IPv6的AAAA记录，格式：(子域名, IPv6索引)
