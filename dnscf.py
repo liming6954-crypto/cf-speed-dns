@@ -56,7 +56,7 @@ A_RECORDS = [
     
     #################################### US 一次返回10条记录#########################################
     ("ip.164746.xyz/ipTop10.html",2),
-    ("ip.164746.xyz/ipTop10.html"3),
+    ("ip.164746.xyz/ipTop10.html",3),
     ("ip.164746.xyz/ipTop10.html",4),
     ("ip.164746.xyz/ipTop10.html",5),
     ("ip.164746.xyz/ipTop10.html",6),
