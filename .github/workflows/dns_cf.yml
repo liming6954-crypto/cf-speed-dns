@@ -5,7 +5,8 @@ env:
 
 on:
   schedule:
-    - cron: '25 * * * *'
+    - cron: '0 */6  * * *' #m每4小时
+  
   workflow_dispatch:
 
 jobs:
